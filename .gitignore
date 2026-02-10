@@ -1,0 +1,28 @@
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# PocketBase data
+pb_data/
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
+
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+*.wasm.gz
