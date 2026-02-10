@@ -97,6 +97,7 @@ hearth/
 
 ## Key Project Documents
 - **`vesta_master_plan.md`** — Master design & technical specification
+- **`docs/PROJECT_CHRONICLE.md`** — Universal source of truth: bugs, ADRs, pivots, lessons learned, backburner ideas
 - **`docs/ROADMAP.md`** — Release roadmap with versioned milestones and task IDs
 - **`docs/RESEARCH_BACKLOG.md`** — Active research tasks and open questions
 - **`docs/research/`** — Technical and UX research reports

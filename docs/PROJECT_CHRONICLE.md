@@ -1,0 +1,439 @@
+# Hearth (Project Vesta) — Project Chronicle
+
+> **Purpose:** Institutional knowledge capture for AI-assisted development. This document records bugs, architecture decisions, failed approaches, lessons learned, and backburnered ideas throughout Hearth's development.
+>
+> **For Copilot Agents:** Reference this document when working on Hearth to avoid repeating past mistakes and understand why things are built the way they are. **Ask the user before modifying:** SQLite pragma config, HMAC crypto, memory budget allocations, LiveKit config, or Docker resource limits.
+>
+> **Version:** 1.0 (February 10, 2026) — Project kickoff. Research & Exploration phase. No production code yet.
+
+---
+
+## 📊 Project Status Dashboard
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| **Master Specification** | ✅ Complete | `vesta_master_plan.md` — 11 sections, fully expanded |
+| **Technical Research** | ✅ Complete | PocketBase/SQLite, LiveKit, Extism/Wasm, security |
+| **UX Research** | ✅ Complete | Spatial audio, ephemeral messaging, cozy UI, onboarding |
+| **Release Roadmap** | ✅ Complete | 6 releases (v0.1 Ember → v2.0 Open Flame) with task IDs |
+| **Research Backlog** | ✅ Complete | 8 active research tasks, 8 open questions |
+| **Agent Roles** | ✅ Complete | Builder, Researcher, Reviewer — specialized for Hearth |
+| **Backend (PocketBase)** | 🔲 Not Started | Blocked on R-001 (API verification) |
+| **Frontend (React/Vite)** | 🔲 Not Started | Scheduled for v0.2 |
+| **Voice (LiveKit)** | 🔲 Not Started | Scheduled for v0.3 |
+| **Docker Deployment** | 🔲 Not Started | Blocked on ADR-001 (container topology) |
+| **Plugin System (Extism)** | 🔲 Not Started | Scheduled for v2.0 |
+
+### Current Milestone
+- **v0.0 — Research & Foundation** (Feb 2026) — IN PROGRESS
+- Next: **v0.1 Ember** (Backend skeleton + chat API) — Target: Apr 2026
+
+---
+
+## 📚 Reference Documents
+
+| Document | Purpose |
+|----------|---------|
+| [`vesta_master_plan.md`](../vesta_master_plan.md) | Master design & technical specification |
+| [`docs/ROADMAP.md`](ROADMAP.md) | Release roadmap with versioned milestones and task IDs |
+| [`docs/RESEARCH_BACKLOG.md`](RESEARCH_BACKLOG.md) | Active research tasks and open questions |
+| [`docs/research/Hearth Technical Research.md`](research/Hearth%20Technical%20Research.md) | Technical deep-dive (SQLite, LiveKit, Extism, security) |
+| [`docs/research/Hearth_ Digital Living Room UX Report.md`](research/Hearth_%20Digital%20Living%20Room%20UX%20Report.md) | UX research (spatial audio, fading text, cozy UI, The Knock) |
+| [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) | AI development context, coding standards |
+| [`.github/agents/Builder.md`](../.github/agents/Builder.md) | Builder agent role (implementation specialist) |
+| [`.github/agents/Researcher.md`](../.github/agents/Researcher.md) | Researcher agent role (tech investigation) |
+| [`.github/agents/Reviewer.md`](../.github/agents/Reviewer.md) | Reviewer agent role (QA + sprint coordination) |
+
+---
+
+## Table of Contents
+
+1. [Project Timeline](#project-timeline)
+2. [Architecture Overview](#architecture-overview)
+3. [Architecture Decisions](#architecture-decisions)
+4. [Bug Registry](#bug-registry)
+5. [Production Incidents](#production-incidents)
+6. [Failed Approaches & Pivots](#failed-approaches--pivots)
+7. [Magic Numbers & Configuration](#magic-numbers--configuration)
+8. [External Service Learnings](#external-service-learnings)
+9. [Backburner Ideas](#backburner-ideas)
+10. [Communication Patterns](#communication-patterns)
+
+---
+
+## Project Timeline
+
+| Date | Milestone | Notes |
+|------|-----------|-------|
+| 2026-02-10 | **Project Kickoff** | Initial discussion with Gemini 3 Pro. Philosophy, tech stack, and constraints defined. |
+| 2026-02-10 | **Master Spec v1** | `vesta_master_plan.md` stub created — mission, tech stack, core features, design system |
+| 2026-02-10 | **Research Collection** | Two comprehensive research reports completed (technical + UX) |
+| 2026-02-10 | **Repo Initialized** | Git repo, `.gitignore`, `copilot-instructions.md` |
+| 2026-02-10 | **Spec Expansion** | Master plan expanded to 11 sections incorporating all research findings |
+| 2026-02-10 | **Gemini Review** | External review validated co-located monolith, CSS decay engine, click-to-drift. Identified SSL/TLS gap → Caddy added to stack. Flagged stale PocketBase API. |
+| 2026-02-10 | **Planning Artifacts** | Release roadmap (6 versions), research backlog (8 tasks, 8 questions), specialized agent roles |
+| 2026-02-10 | **Project Chronicle** | This document — institutional knowledge capture begins |
+
+---
+
+## Architecture Overview
+
+### System Topology
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    1 vCPU / 1GB RAM VPS                       │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                    Caddy (~10MB)                         │ │
+│  │  Auto-TLS (Let's Encrypt)                               │ │
+│  │  api.hearth.example → PocketBase :8090                  │ │
+│  │  lk.hearth.example  → LiveKit WS  :7880                │ │
+│  └────────────────────────┬────────────────────────────────┘ │
+│                           │                                   │
+│  ┌────────────────────────┴────────────────────────────────┐ │
+│  │                                                          │ │
+│  │  ┌──────────────────┐    ┌───────────────────────────┐  │ │
+│  │  │   PocketBase     │    │     LiveKit SFU           │  │ │
+│  │  │   (250MB heap)   │    │     (400MB heap)          │  │ │
+│  │  │                  │    │                           │  │ │
+│  │  │  • Auth          │    │  • WebRTC (UDP)           │  │ │
+│  │  │  • Chat API      │    │  • Opus audio forwarding  │  │ │
+│  │  │  • WebSocket     │    │  • ICE Lite               │  │ │
+│  │  │  • Cron (GC)     │    │  • DTX (silence suppress) │  │ │
+│  │  │  • Wasm plugins  │    │  • Dynacast               │  │ │
+│  │  │                  │    │                           │  │ │
+│  │  │  ┌────────────┐  │    └───────────────────────────┘  │ │
+│  │  │  │  SQLite    │  │                                    │ │
+│  │  │  │  (WAL mode)│  │    ┌───────────────────────────┐  │ │
+│  │  │  │  ~50MB     │  │    │  Wasm Plugin Pool (50MB)  │  │ │
+│  │  │  └────────────┘  │    │  Extism / Wasmtime        │  │ │
+│  │  └──────────────────┘    └───────────────────────────┘  │ │
+│  │                                                          │ │
+│  │              OS Headroom: ~100MB                          │ │
+│  └──────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Memory Budget (1GB Total — Sacred)
+
+| Component | Allocation | Control |
+|-----------|-----------|---------|
+| OS Kernel & System | 150 MB | Minimal Alpine/Debian |
+| PocketBase (Heap) | 250 MB | `GOMEMLIMIT=250MiB` |
+| LiveKit SFU (Heap) | 400 MB | `GOMEMLIMIT=400MiB` |
+| Wasm Plugin Pool | 50 MB | Fixed instance pool |
+| SQLite Page Cache | 50 MB | `PRAGMA cache_size` |
+| Safety Headroom | 100 MB | Prevent OOM kill |
+
+### Data Flow
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Browser    │    │   Browser    │    │   Browser    │
+│   (React)    │    │   (React)    │    │   (React)    │
+└──────┬───────┘    └──────┬───────┘    └──────┬───────┘
+       │ WSS/HTTPS         │ WSS/HTTPS         │ UDP (WebRTC)
+       ▼                   ▼                   ▼
+┌──────────────────────────────────────────────────────┐
+│                      Caddy                            │
+│              (TLS termination)                        │
+└──────────┬───────────────────────────┬───────────────┘
+           │                           │
+    ┌──────▼──────┐            ┌───────▼──────┐
+    │  PocketBase  │            │   LiveKit    │
+    │  (Chat/Auth) │◄──JWT──────│   (Voice)    │
+    │  + SQLite    │            │   (SFU)      │
+    └──────────────┘            └──────────────┘
+```
+
+---
+
+## Architecture Decisions
+
+### ADR-001: Container Topology (PENDING)
+
+**Date:** February 10, 2026 | **Status:** Proposed — needs research (R-003)
+
+**Context:** The master plan originally said "Single Docker Container." Actual deployment needs 3 processes: PocketBase, LiveKit, Caddy. LiveKit recommends `network_mode: host` for WebRTC UDP performance.
+
+**Options Under Evaluation:**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| Single container + s6-overlay | Simplest UX (`docker run` one thing) | Non-standard, harder to debug, process supervision complexity |
+| Docker Compose (3 containers) | Standard Docker practice, clean isolation | More complex setup for self-hosters |
+| Hybrid (PB+Caddy in one, LiveKit on host) | Balances simplicity + LiveKit UDP perf | Two different networking modes |
+
+**Decision:** Pending R-003 research.
+
+---
+
+### ADR-002: PocketBase as Backend Framework
+
+**Date:** February 10, 2026 | **Status:** Accepted
+
+**Decision:** Use PocketBase (Go + embedded SQLite) as the sole backend framework.
+
+**Rationale:**
+- Single Go binary with embedded DB eliminates TCP database protocol overhead
+- Built-in auth, real-time subscriptions, file storage, admin UI
+- SQLite in WAL mode provides concurrent reads with minimal RAM
+- Go's `GOMEMLIMIT` prevents OOM in constrained environments
+- No need for Redis, PostgreSQL, or any external dependency
+
+**Risk:** PocketBase is a single-maintainer project. If abandoned, we'd need to fork or migrate. Mitigated by: it's open-source Go, well-structured, and our usage is straightforward.
+
+---
+
+### ADR-003: CSS-Driven Visual Decay (Not JavaScript)
+
+**Date:** February 10, 2026 | **Status:** Accepted
+
+**Decision:** Message fading (transparency decay) is driven entirely by CSS animations, not JavaScript timers.
+
+**Rationale:**
+- CSS animations are compositor-thread (often GPU-accelerated) and "free" in terms of CPU/battery
+- `setInterval`/`setTimeout` keep the main thread awake and drain mobile batteries
+- Negative `animation-delay` allows mid-fade rendering on page reload (e.g., 30s into a 60s message → renders at 50% opacity)
+- This is a core optimization identified in both the technical research and Gemini review
+
+**Implementation Pattern:**
+```jsx
+const style = {
+  animationName: 'fadeOut',
+  animationDuration: `${ttl}s`,
+  animationDelay: `-${age}s`,
+  animationTimingFunction: 'linear',
+  animationFillMode: 'forwards'
+};
+```
+
+**Open Question:** R-008 — performance at scale (200 concurrent CSS animations). Needs benchmarking.
+
+---
+
+### ADR-004: Stateless HMAC Invite Tokens
+
+**Date:** February 10, 2026 | **Status:** Accepted
+
+**Decision:** Invite links are self-validating HMAC tokens with zero database storage.
+
+**Rationale:**
+- No DB writes on invite creation (can't flood the database)
+- Validation requires only CPU (one hash operation) — extremely fast
+- Secret key rotation instantly invalidates all outstanding invites
+- Two-key system (current + old) provides grace period during rotation
+
+**Implementation:**
+```
+URL: https://hearth.example/join?r=room1&t=1735689600&s=f8a...
+Validate: HMAC_SHA256(secret, r + "." + t) == s (constant-time compare)
+```
+
+**Constraint:** MUST use `crypto/subtle.ConstantTimeCompare` in Go. Never `==` or `bytes.Equal` for hash comparison — timing side-channel risk.
+
+---
+
+### ADR-005: Caddy for TLS Termination
+
+**Date:** February 10, 2026 | **Status:** Accepted
+
+**Decision:** Use Caddy as a reverse proxy/TLS terminator for both PocketBase and LiveKit.
+
+**Context:** WebRTC requires HTTPS/WSS — browsers block microphone access on insecure origins (except localhost). PocketBase has built-in Auto-TLS, but LiveKit also needs TLS for its WebSocket signaling endpoint. Identified during Gemini 3 Pro review.
+
+**Rationale:**
+- Caddy uses near-zero RAM (~10MB) — fits in the OS headroom budget
+- Automatic Let's Encrypt certificate management for both services
+- Single point of TLS configuration
+- PocketBase's built-in TLS can be disabled to avoid double-termination
+
+**Open Question:** How Caddy interacts with LiveKit's `network_mode: host` (see ADR-001 / R-002).
+
+---
+
+## Bug Registry
+
+> No bugs yet — project is in research phase. This section will grow once implementation begins.
+
+| ID | Severity | Component | Title | Status | Date Found | Date Fixed |
+|----|----------|-----------|-------|--------|-----------|-----------|
+| — | — | — | — | — | — | — |
+
+---
+
+## Production Incidents
+
+> No production incidents — project has not shipped yet.
+
+| Date | Severity | Description | Root Cause | Resolution | Duration |
+|------|----------|-------------|-----------|------------|----------|
+| — | — | — | — | — | — |
+
+---
+
+## Failed Approaches & Pivots
+
+### PIVOT-001: "Single Docker Container" → Docker Compose
+
+**Date:** February 10, 2026
+
+**Original Plan:** Ship as a single Docker container for maximum simplicity.
+
+**What Changed:** Realized we need 3 processes (PocketBase, LiveKit, Caddy). LiveKit benefits significantly from `network_mode: host` for UDP performance. Running 3 processes in one container requires a process supervisor (s6-overlay or supervisord), which is non-standard and harder to debug.
+
+**Current Direction:** Likely Docker Compose with 3 containers. Final decision pending ADR-001 research.
+
+**Lesson Learned:** "Single container" sounds simple but multi-process containers are actually more complex to operate than Docker Compose.
+
+---
+
+### PIVOT-002: PocketBase API Version
+
+**Date:** February 10, 2026
+
+**Context:** Gemini 3 Pro provided a `main.go` scaffold using `app.OnBeforeServe()` and `app.Dao().DB()`. These are the **older** PocketBase API (pre-v0.23).
+
+**What's Actually Current:** PocketBase v0.23+ uses `app.OnServe()` and `app.DB()` directly. The entire hook and data access API has shifted.
+
+**Lesson Learned:** Always verify API versions against official documentation before writing code. AI models (including Gemini) can have stale training data. Flagged as R-001 in the research backlog — this MUST be resolved before any Go code is written.
+
+---
+
+## Magic Numbers & Configuration
+
+> Configuration values that are tuned for the 1GB constraint. **Do not change without understanding the memory implications.**
+
+### SQLite Pragmas
+
+| Pragma | Value | Why This Value |
+|--------|-------|---------------|
+| `journal_mode` | WAL | Non-blocking concurrent reads/writes |
+| `synchronous` | NORMAL | Fewer `fsync()`; sufficient for app crashes (not power loss) |
+| `cache_size` | -2000 | ~2MB; rely on OS filesystem cache to save app RAM |
+| `mmap_size` | 268435456 | 256MB mmap; reduces `read()` syscalls |
+| `busy_timeout` | 5000 | 5s lock timeout; prevents immediate failures under load |
+
+### LiveKit Tuning
+
+| Parameter | Value | Why |
+|-----------|-------|-----|
+| `audio_bitrate` | 24,000 bps | Knee-of-curve for voice clarity vs. bandwidth |
+| `frame_size` | 60 ms | Reduces packet header/payload ratio overhead |
+| `use_dtx` | true | ~90% CPU reduction in typical group call (1 speaker, 9 silent) |
+| `use_inband_fec` | true | Packet loss resilience without server-side NACK buffers |
+| `use_ice_lite` | true | Reduced handshake CPU cost |
+| `port_range` | 50000–60000 | 10K ports; supports ~200 users with minimal kernel overhead |
+
+### Go Runtime
+
+| Variable | Value | Why |
+|----------|-------|-----|
+| `GOMEMLIMIT` (PocketBase) | 250MiB | Triggers GC before heap grows to dangerous levels |
+| `GOMEMLIMIT` (LiveKit) | 400MiB | Same — prevents OOM from GC delay |
+
+### Message Decay
+
+| Parameter | Value | Why |
+|-----------|-------|-----|
+| GC cron interval | 1 minute | Batches deletes; avoids thundering herd on expiry |
+| VACUUM schedule | Nightly (4 AM) | Full DB rewrite for physical data erasure; blocking, so off-peak only |
+| Default message TTL | TBD | Needs UX research — likely 1–24 hours configurable per room |
+
+### Presence
+
+| Parameter | Value | Why |
+|-----------|-------|-----|
+| Heartbeat interval | 30 seconds | Balance between freshness and server load |
+| Offline threshold | 2 missed beats (60s) | Prevents "ghost" users from cluttering UI |
+
+---
+
+## External Service Learnings
+
+### PocketBase
+- **Version Churn:** API changed significantly at v0.23. Always verify against current docs. (PIVOT-002)
+- **Single Maintainer:** Bus factor of 1. Mitigated by: open source, Go, well-structured.
+- **WAL Mode:** Must be explicitly set via PRAGMAs at startup. Not the default.
+- **In-Memory State:** Use Go `sync.RWMutex` maps for ephemeral data (presence). Don't persist transient state to SQLite — generates excessive I/O.
+
+### LiveKit
+- **Network Mode:** Docs recommend `network_mode: host` for WebRTC UDP performance. Conflicts with Docker Compose bridge networking.
+- **ICE Lite:** Drastically reduces connection handshake CPU. Must be enabled for 1 vCPU target.
+- **No Transcoding:** `video.enable_transcoding: false` is a hard requirement. Transcoding spawns FFmpeg, which will kill a 1 vCPU server.
+- **DTX is Free Performance:** Discontinuous Transmission suppresses silence. In a 10-person call, usually only 1 person speaks → 90% CPU savings.
+
+### Caddy
+- **Near-Zero Overhead:** ~10MB RAM. Perfect for constrained environments.
+- **Auto-TLS:** Handles Let's Encrypt automatically. No manual cert management.
+- **Not Yet Tested:** We haven't verified the dual-proxy configuration (PocketBase + LiveKit) in practice.
+
+---
+
+## Backburner Ideas
+
+> Ideas that are interesting but deferred — not currently on the roadmap. May be revisited in future versions.
+
+### BB-001: Matrix Protocol Integration
+**Source:** UX Research Report (Section 5.1)
+**Idea:** Run Hearth on the Matrix protocol (for federation) but hide the complexity behind a friendly UI.
+**Why Deferred:** Matrix adds massive complexity (Synapse/Dendrite server, DAG-based event resolution). Likely explodes the 1GB RAM target. Federation is a v3+ consideration if demand exists.
+**Revisit When:** After v1.0 ships and we understand real user demand for cross-instance communication.
+
+### BB-002: Procedural Generative Ambience
+**Source:** UX Research Report (Section 3.4)
+**Idea:** Use Web Audio API oscillators + noise generators for zero-download procedural ambient sounds (fire, rain, coffee shop).
+**Why Deferred:** Needs dedicated audio engineering research. Pre-recorded loops are simpler for v0.2. Procedural generation could be a distinguishing feature but isn't MVP-critical.
+**Revisit When:** After v0.2 ships with basic sound design.
+
+### BB-003: Insertable Streams E2EE
+**Source:** Technical Research (Section 5.3)
+**Idea:** WebRTC E2EE where the browser encrypts audio/video frames before the WebRTC stack. LiveKit sees only encrypted blobs ("trust the math, not the admin").
+**Why Deferred:** Complex key management (room key distribution, rotation, revocation). Browser API support still evolving. Scheduled for v2.0 but could be deferred further.
+**Revisit When:** v1.0 is stable and security audit is complete.
+
+### BB-004: Plugin Marketplace / Distribution
+**Source:** Master Plan (Section 11)
+**Idea:** Curated or open marketplace for Cartridges. Signing requirements. Discovery mechanism.
+**Why Deferred:** Need the plugin system (v2.0) to exist first. Distribution is a post-launch concern.
+**Revisit When:** After v2.0 Cartridge system is stable with real plugins in use.
+
+### BB-005: "Picture Frame" Ambient Video
+**Source:** Open Question Q-004
+**Idea:** Low-res, low-fps ambient video — webcam as a portrait on the wall, not a traditional video call. Fits the "living room" metaphor.
+**Why Deferred:** Video is CPU-expensive on 1 vCPU. Voice-first is the v1.0 priority.
+**Revisit When:** After voice (v0.3) ships and we have real performance data.
+
+---
+
+## Communication Patterns
+
+### Hearth Vocabulary (Use Consistently)
+
+| Term | Meaning | Avoid Saying |
+|------|---------|-------------|
+| **Portal** | Ambient spatial voice space | "voice channel," "voice room" |
+| **Campfire** | Ephemeral fading chat | "text channel," "chat room" |
+| **Knock** | Guest entry request | "invite," "join request" |
+| **Peephole** | Host preview of a Knock | "notification," "alert" |
+| **Front Porch** | Waiting UI for guests | "waiting room," "lobby" |
+| **Cartridge** | Wasm plugin | "bot," "extension," "add-on" |
+| **Ember** | Active speaker glow | "green ring," "speaking indicator" |
+| **Subtle Warmth** | Design system name | "theme," "color scheme" |
+| **Hearth** | The product | "app," "platform" (in user-facing context) |
+| **Project Vesta** | Development codename | (internal only) |
+
+### Agent Handoff Format
+
+When passing work between agents (Researcher → Builder, Builder → Reviewer):
+
+```markdown
+## Handoff: [From Agent] → [To Agent]
+**Task ID:** [E/K/H/F/W/O-XXX]
+**Context:** [What was done, key findings]
+**Deliverables:** [Files created/modified]
+**Blockers Resolved:** [What was blocking, how it was resolved]
+**Open Items:** [Anything deferred or needing attention]
+**Next Step:** [Specific action for receiving agent]
+```
