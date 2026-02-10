@@ -7,20 +7,15 @@
 
 ## Active Research Tasks
 
-### R-001: PocketBase v0.23+ API Verification
+### R-001: PocketBase v0.23+ API Verification ✅ COMPLETE
 **Priority:** Critical | **Blocks:** E-004, E-010 through E-015
-**Question:** What is the current PocketBase Go API for hooks, DB access, and cron scheduling?
-**Context:** Gemini's suggested `main.go` uses `app.OnBeforeServe()` and `app.Dao().DB()`, which are the **old** PocketBase API (pre-v0.23). Current PocketBase uses `app.OnServe()` and `app.DB()` directly. We need the correct API surface before Builder writes any Go code.
-**Deliverable:** Verified code patterns for startup hooks, PRAGMA injection, cron registration, and collection CRUD.
+**Status:** Complete — 2026-02-10 | **Report:** [`docs/research/R-001-pocketbase-api-verification.md`](research/R-001-pocketbase-api-verification.md)
+**Outcome:** PocketBase v0.36.2 API fully verified. Current correct patterns: `app.OnServe().BindFunc()` for startup hooks, `app.DB()` for raw SQL via dbx builder, `app.Cron().MustAdd()` for scheduling, `app.FindRecordById()`/`app.FindRecordsByFilter()` for records, `core.NewRecord()` + `app.Save()` for creation, `app.RunInTransaction()` for atomic ops, `app.SubscriptionsBroker()` for custom realtime. SQLite PRAGMAs injected via `app.OnBootstrap()`. Deprecated patterns fully documented with migration table. **Backend is now unblocked.**
 
-### R-002: Caddy Reverse Proxy for PocketBase + LiveKit TLS
+### R-002: Caddy Reverse Proxy for PocketBase + LiveKit TLS ✅ COMPLETE
 **Priority:** Critical | **Blocks:** E-005, E-006
-**Question:** How to configure Caddy to terminate TLS for both PocketBase HTTP/WS and LiveKit's WebSocket/TURN endpoints in a single container setup?
-**Context:** Gemini correctly identified that WebRTC requires SSL — browsers block microphone access on insecure origins (except localhost). PocketBase has built-in Auto-TLS, but LiveKit also needs TLS. Need to determine:
-- Can Caddy proxy both in one Caddyfile?
-- LiveKit uses `network_mode: host` for UDP performance — how does this interact with Caddy?
-- Do we need separate subdomains (`api.hearth.example` / `lk.hearth.example`) or path-based routing?
-**Deliverable:** Working Caddyfile + ADR on TLS topology.
+**Status:** Complete — 2026-02-10 | **Report:** [`docs/research/R-002-caddy-livekit-tls-config.md`](research/R-002-caddy-livekit-tls-config.md)
+**Outcome:** Major discovery — LiveKit's official deployment uses a **custom Caddy build** (`livekit/caddyl4`) with Layer 4 TLS SNI routing, NOT a standard Caddyfile. Config is YAML, not Caddyfile syntax. Architecture: Caddy listens :443, routes by SNI to TURN (localhost:5349), LiveKit API (localhost:7880), and PocketBase (localhost:8090). All containers use `network_mode: "host"`. Three subdomains: `hearth.example` / `lk.hearth.example` / `turn.hearth.example`. **Redis is NOT required for single-node** (saves ~25MB RAM). Complete `caddy.yaml`, `livekit.yaml`, and `docker-compose.yaml` templates provided. Q-008 resolved. **Docker deployment is now unblocked.**
 
 ### R-003: Container Topology Decision (ADR-001)
 **Priority:** High | **Blocks:** E-005
@@ -116,13 +111,10 @@
 **Context:** The spec targets ~20 concurrent users. We need real load testing to know the ceiling and identify the first bottleneck (CPU? WAL contention? WebSocket fan-out?).
 **Status:** Scheduled for v1.0 performance profiling (F-013).
 
-### Q-008: LiveKit Host Network Mode + Docker Compose
+### Q-008: LiveKit Host Network Mode + Docker Compose ✅ RESOLVED
 **Question:** LiveKit documentation recommends `network_mode: host` for WebRTC UDP performance. This conflicts with Docker Compose networking (Caddy can't reach LiveKit via `vesta-net` if LiveKit is on the host network).
-**Options:**
-1. LiveKit on host network, Caddy proxies to `host.docker.internal:7880`
-2. All containers on host network (lose Docker network isolation)
-3. LiveKit in bridge mode with published UDP port range (slight perf hit)
-**Status:** Needs research (part of R-003).
+**Answer:** **Option 2 — ALL containers on host network.** LiveKit's official Docker Compose template (from `livekit/deploy` repo) uses `network_mode: "host"` for every container (Caddy, LiveKit, Redis). All services communicate via `localhost`. This eliminates the bridge/host conflict entirely. Trade-off is no Docker network isolation, which is acceptable since all services are trusted.
+**Resolved by:** R-002 (2026-02-10). See [`R-002-caddy-livekit-tls-config.md`](research/R-002-caddy-livekit-tls-config.md).
 
 ---
 
@@ -130,4 +122,5 @@
 
 | ID | Topic | Date Completed | Outcome |
 |----|-------|---------------|---------|
-| — | (none yet) | — | — |
+| R-001 | PocketBase v0.23+ API Verification | 2026-02-10 | PocketBase v0.36.2 API fully documented. Deprecated→current migration table. 10 verified code patterns. Backend unblocked. |
+| R-002 | Caddy + LiveKit TLS Configuration | 2026-02-10 | Layer 4 TLS SNI routing via custom Caddy build. YAML config (not Caddyfile). Host networking for all containers. Redis-free single-node. Complete deployment templates. |

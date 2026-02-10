@@ -16,12 +16,12 @@
 | **Technical Research** | ✅ Complete | PocketBase/SQLite, LiveKit, Extism/Wasm, security |
 | **UX Research** | ✅ Complete | Spatial audio, ephemeral messaging, cozy UI, onboarding |
 | **Release Roadmap** | ✅ Complete | 6 releases (v0.1 Ember → v2.0 Open Flame) with task IDs |
-| **Research Backlog** | ✅ Complete | 8 active research tasks, 8 open questions |
+| **Research Backlog** | ✅ Complete | 8 active research tasks, 8 open questions. R-001, R-002 complete. |
 | **Agent Roles** | ✅ Complete | Builder, Researcher, Reviewer — specialized for Hearth |
-| **Backend (PocketBase)** | 🔲 Not Started | Blocked on R-001 (API verification) |
+| **Backend (PocketBase)** | 🟡 Unblocked | R-001 complete — API verified, code patterns ready |
 | **Frontend (React/Vite)** | 🔲 Not Started | Scheduled for v0.2 |
 | **Voice (LiveKit)** | 🔲 Not Started | Scheduled for v0.3 |
-| **Docker Deployment** | 🔲 Not Started | Blocked on ADR-001 (container topology) |
+| **Docker Deployment** | 🟡 Unblocked | R-002 complete — Caddy L4, host networking, templates ready |
 | **Plugin System (Extism)** | 🔲 Not Started | Scheduled for v2.0 |
 
 ### Current Milestone
@@ -73,6 +73,8 @@
 | 2026-02-10 | **Gemini Review** | External review validated co-located monolith, CSS decay engine, click-to-drift. Identified SSL/TLS gap → Caddy added to stack. Flagged stale PocketBase API. |
 | 2026-02-10 | **Planning Artifacts** | Release roadmap (6 versions), research backlog (8 tasks, 8 questions), specialized agent roles |
 | 2026-02-10 | **Project Chronicle** | This document — institutional knowledge capture begins |
+| 2026-02-10 | **R-001 Complete** | PocketBase v0.36.2 API verified. `app.OnServe()`, `app.DB()`, `app.Cron().MustAdd()` confirmed. Deprecated API migration table documented. Backend unblocked. |
+| 2026-02-10 | **R-002 Complete** | Critical discovery: LiveKit uses custom Caddy build with Layer 4 TLS SNI routing (YAML config, not Caddyfile). All Docker containers use `network_mode: host`. Redis optional for single-node. Complete deployment templates produced. Q-008 resolved. |
 
 ---
 
@@ -235,21 +237,40 @@ Validate: HMAC_SHA256(secret, r + "." + t) == s (constant-time compare)
 
 ---
 
-### ADR-005: Caddy for TLS Termination
+### ADR-005: Caddy for TLS Termination (Layer 4 SNI Routing)
 
-**Date:** February 10, 2026 | **Status:** Accepted
+**Date:** February 10, 2026 | **Status:** Accepted — Updated with R-002 findings
 
-**Decision:** Use Caddy as a reverse proxy/TLS terminator for both PocketBase and LiveKit.
+**Decision:** Use a **custom Caddy build** (`caddy-l4` + `caddy-yaml` modules) as a Layer 4 TLS SNI router for all three services.
 
-**Context:** WebRTC requires HTTPS/WSS — browsers block microphone access on insecure origins (except localhost). PocketBase has built-in Auto-TLS, but LiveKit also needs TLS for its WebSocket signaling endpoint. Identified during Gemini 3 Pro review.
+**Context:** WebRTC requires HTTPS/WSS — browsers block microphone access on insecure origins (except localhost). PocketBase has built-in Auto-TLS, but LiveKit also needs TLS for its WebSocket signaling endpoint. Identified during Gemini 3 Pro review. **R-002 research revealed that TURN traffic is NOT HTTP — it requires Layer 4 (raw TCP/TLS) proxying, which a standard Caddyfile `reverse_proxy` cannot handle.**
+
+**Architecture:**
+```
+Internet :443 → Caddy L4 (TLS SNI) → turn.hearth.example → LiveKit TURN :5349
+                                      → lk.hearth.example   → LiveKit API  :7880
+                                      → hearth.example       → PocketBase   :8090
+```
 
 **Rationale:**
-- Caddy uses near-zero RAM (~10MB) — fits in the OS headroom budget
-- Automatic Let's Encrypt certificate management for both services
-- Single point of TLS configuration
+- Caddy uses near-zero RAM (~15-20MB) — fits in the OS headroom budget
+- Automatic Let's Encrypt certificate management for all three subdomains
+- Layer 4 SNI routing enables TURN (non-HTTP TLS) on the same port 443 as HTTPS
+- TURN route passes raw TLS stream to LiveKit; HTTP routes terminate TLS at Caddy
 - PocketBase's built-in TLS can be disabled to avoid double-termination
 
-**Open Question:** How Caddy interacts with LiveKit's `network_mode: host` (see ADR-001 / R-002).
+**Required Custom Build:**
+```
+xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy-l4
+```
+
+**Config Format:** YAML (loaded with `caddy run --config caddy.yaml --adapter yaml`), not Caddyfile.
+
+**Key Constraint:** TURN cert path is fragile — LiveKit must read Caddy-managed cert files. Shared Docker volume required.
+
+**Full spec:** [`docs/research/R-002-caddy-livekit-tls-config.md`](research/R-002-caddy-livekit-tls-config.md)
+
+**Open Question:** LiveKit cert hot-reload after Caddy auto-renewal (may need SIGHUP or container restart on cert change).
 
 ---
 
@@ -283,9 +304,9 @@ Validate: HMAC_SHA256(secret, r + "." + t) == s (constant-time compare)
 
 **What Changed:** Realized we need 3 processes (PocketBase, LiveKit, Caddy). LiveKit benefits significantly from `network_mode: host` for UDP performance. Running 3 processes in one container requires a process supervisor (s6-overlay or supervisord), which is non-standard and harder to debug.
 
-**Current Direction:** Likely Docker Compose with 3 containers. Final decision pending ADR-001 research.
+**Current Direction:** Docker Compose with host networking for all containers. **Confirmed by R-002:** LiveKit's official deployment template uses `network_mode: "host"` for every container. All services communicate via localhost. This is mandatory for WebRTC UDP performance.
 
-**Lesson Learned:** "Single container" sounds simple but multi-process containers are actually more complex to operate than Docker Compose.
+**Lesson Learned:** "Single container" sounds simple but multi-process containers are actually more complex to operate than Docker Compose. Host networking eliminates bridge/host conflicts but sacrifices container-level network isolation (acceptable for trusted co-located services).
 
 ---
 
@@ -359,15 +380,23 @@ Validate: HMAC_SHA256(secret, r + "." + t) == s (constant-time compare)
 - **In-Memory State:** Use Go `sync.RWMutex` maps for ephemeral data (presence). Don't persist transient state to SQLite — generates excessive I/O.
 
 ### LiveKit
-- **Network Mode:** Docs recommend `network_mode: host` for WebRTC UDP performance. Conflicts with Docker Compose bridge networking.
+- **Network Mode:** Official deployment uses `network_mode: host` for ALL containers (Caddy, LiveKit, Redis). This is mandatory for WebRTC UDP hole punching and TURN port binding. Confirmed by `livekit/deploy` templates.
+- **Redis is OPTIONAL for single-node:** Omitting the `redis` config section runs LiveKit in single-node mode. Saves ~25MB RAM. Redis only needed for distributed multi-node setups. Can be added later with zero code changes.
 - **ICE Lite:** Drastically reduces connection handshake CPU. Must be enabled for 1 vCPU target.
 - **No Transcoding:** `video.enable_transcoding: false` is a hard requirement. Transcoding spawns FFmpeg, which will kill a 1 vCPU server.
 - **DTX is Free Performance:** Discontinuous Transmission suppresses silence. In a 10-person call, usually only 1 person speaks → 90% CPU savings.
+- **TURN Built-In:** LiveKit has a built-in TURN server (no separate coturn needed). Needs TLS cert files from Caddy. Listens on :5349 (TLS) and :3478 (UDP).
+- **Port Range:** 50000-60000/UDP for WebRTC media. Could be reduced to 50000-50100 for Hearth's scale (~20 users).
+- **Source:** R-002 research, LiveKit official docs, `livekit/livekit` config-sample.yaml.
 
 ### Caddy
-- **Near-Zero Overhead:** ~10MB RAM. Perfect for constrained environments.
+- **Near-Zero Overhead:** ~15-20MB RAM. Perfect for constrained environments.
 - **Auto-TLS:** Handles Let's Encrypt automatically. No manual cert management.
-- **Not Yet Tested:** We haven't verified the dual-proxy configuration (PocketBase + LiveKit) in practice.
+- **Layer 4 Module Required:** Stock Caddy cannot route TURN traffic. Must build custom binary with `caddy-l4` (Layer 4 proxy) and `caddy-yaml` (YAML config adapter) modules. The build uses `xcaddy`.
+- **Config is YAML, not Caddyfile:** LiveKit's deployment templates use YAML config format. This maps directly to Caddy's internal JSON config. Standard Caddyfile examples do NOT translate 1:1 to L4 routes.
+- **TLS SNI Routing:** Layer 4 reads the SNI field from TLS ClientHello to route traffic. TURN gets raw TLS passthrough; HTTP services get TLS termination + HTTP reverse proxy.
+- **Certificate Sharing:** Caddy auto-manages certs, but LiveKit needs to read the cert files for its TURN server. Requires shared Docker volume with specific cert paths.
+- **Source:** R-002 research, `livekit/deploy` GitHub repo (`templates/caddy.go`, `caddyl4/Dockerfile`).
 
 ---
 
