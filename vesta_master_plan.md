@@ -28,9 +28,10 @@ To build **Hearth**: a privacy-first, self-hosted, modular communication platfor
 
 | Layer | Technology | Role |
 |-------|-----------|------|
-| Deployment | **Single Docker Container** | Target: 1 vCPU, 1GB RAM |
+| Deployment | **Docker Compose** | Target: 1 vCPU, 1GB RAM |
 | Backend / API | **PocketBase** (Go + SQLite) | Auth, real-time DB, chat history, cron jobs, plugin host |
 | Voice / Video | **LiveKit** (Go, WebRTC SFU) | Spatial audio, bandwidth mgmt, ICE Lite |
+| TLS / Proxy | **Caddy** | Auto-TLS (Let's Encrypt), reverse proxy for PocketBase + LiveKit |
 | Frontend | **React + Vite + TailwindCSS** | TypeScript strict mode |
 | Plugins | **Extism** (Wasm) | Sandboxed WASM plugins ("Cartridges") |
 
@@ -43,6 +44,15 @@ Hearth collapses the entire stack into a single machine. No microservices, no Ku
 - **Storage Layer (SQLite):** Embedded in PocketBase — no TCP database protocol overhead.
 
 This minimizes data travel time and eliminates the memory cost of duplicate caching layers.
+
+### 2.1.1 TLS Termination (Caddy)
+
+WebRTC **requires** HTTPS/WSS — browsers block microphone access on insecure origins (except `localhost`). PocketBase has built-in Auto-TLS but LiveKit also needs TLS for its WebSocket signaling. **Caddy** serves as a lightweight reverse proxy handling auto-TLS (Let's Encrypt) for both:
+
+- `api.hearth.example` → PocketBase (`:8090`)
+- `lk.hearth.example` → LiveKit WebSocket (`:7880`)
+
+Caddy's RAM footprint is negligible (~10MB) and fits within the OS/headroom budget. The exact container topology (single container with process supervisor vs. Docker Compose) is pending ADR-001 (see `docs/RESEARCH_BACKLOG.md`).
 
 ### 2.2 Memory Budget (Sacred — 1GB Total)
 
@@ -291,77 +301,21 @@ Dynamic mixing: ambient volume rises during conversation lulls, ducks when someo
 
 ---
 
-## 9. PROJECT PLAN — PHASED DEVELOPMENT
+## 9. PROJECT PLAN
 
-### Phase 0: Research & Foundation (Current — Feb 2026)
-- [x] Define architecture and philosophy
-- [x] Collect UX research (spatial audio, ephemeral messaging, cozy UI, onboarding)
-- [x] Collect technical research (PocketBase/SQLite tuning, LiveKit optimization, Wasm plugins, security)
-- [x] Create master design specification
-- [x] Initialize repository and copilot instructions
-- [ ] Finalize design system tokens (colors, typography, spacing, motion curves)
-- [ ] Create architecture decision records (ADRs) for key choices
-- [ ] Wireframe core flows: Portal, Campfire, Knock
+> **Detailed release roadmap with task IDs:** See [`docs/ROADMAP.md`](docs/ROADMAP.md)
+> **Research backlog & open questions:** See [`docs/RESEARCH_BACKLOG.md`](docs/RESEARCH_BACKLOG.md)
 
-### Phase 1: Backend Skeleton (Target: Mar–Apr 2026)
-- [ ] Scaffold Go project with PocketBase
-- [ ] Implement SQLite WAL pragmas via startup hooks
-- [ ] Define PocketBase collections: Users, Rooms, Messages
-- [ ] Implement HMAC invite token generation and validation
-- [ ] Implement message GC cron job (lazy sweep + nightly VACUUM)
-- [ ] In-memory presence tracking (Go map + `sync.RWMutex`)
-- [ ] Basic auth flow (email/password + magic link)
-- [ ] LiveKit config + JWT token generation for room access
-- [ ] Proof-of-Work challenge endpoint
-- [ ] `/metrics` endpoint (Prometheus format)
-- [ ] Unit + integration tests for all hooks
+### Release Summary
 
-### Phase 2: Frontend Shell (Target: May–Jun 2026)
-- [ ] Scaffold React + Vite + TailwindCSS project (TypeScript strict)
-- [ ] Implement design system: tokens, components, motion primitives
-- [ ] Build Campfire (chat) UI with transparency decay (CSS animation engine)
-- [ ] Build "Knock" onboarding flow (Door → Peephole → Front Porch → Entry)
-- [ ] "Mumbling" typing indicator
-- [ ] Optimistic message sending with revert-on-error
-- [ ] WebSocket connection management with exponential backoff
-- [ ] Heartbeat-based presence display
-- [ ] Sound system: organic foley library + generative ambient engine
-- [ ] Mobile-first responsive layout + code-splitting
-
-### Phase 3: Voice — The Portal (Target: Jul–Aug 2026)
-- [ ] LiveKit client SDK integration
-- [ ] Spatial audio: proximity-based volume attenuation
-- [ ] Abstract topological space UI (click-to-drift, magnetic zones)
-- [ ] Gradient ripple visualization for speaker range
-- [ ] "Lean In" focus cursor (beamforming UX)
-- [ ] Soft occlusion (low-pass filtering behind barriers)
-- [ ] DTX + Opus DRED client configuration
-- [ ] Voice-first permissions (video restricted by default)
-
-### Phase 4: Cartridges — Plugin System (Target: Sep–Oct 2026)
-- [ ] Extism/Wasm integration in PocketBase hooks
-- [ ] Host function manifest (log, KV, kick, fetch)
-- [ ] Plugin capability configuration (plugins.json)
-- [ ] Plugin lifecycle: load → execute → teardown (per-event)
-- [ ] Memory-capped instance pool (50MB total)
-- [ ] Example plugins: moderation filter, /roll command
-- [ ] Plugin developer documentation + PDK examples
-
-### Phase 5: Security Hardening & E2EE (Target: Nov–Dec 2026)
-- [ ] WebRTC E2EE via Insertable Streams
-- [ ] Key exchange mechanism (public key storage, room key distribution)
-- [ ] Security audit of HMAC flow, PoW, Wasm sandbox
-- [ ] Penetration testing of public endpoints
-- [ ] Secret rotation admin tooling
-
-### Phase 6: Deployment & Polish (Target: Q1 2027)
-- [ ] Single Docker container build (Alpine-based, multi-stage)
-- [ ] Docker Compose for easy self-hosting
-- [ ] systemd service alternative (bare-metal deployment)
-- [ ] Admin dashboard (room management, user management, plugin management)
-- [ ] Documentation: self-hosting guide, admin guide, plugin developer guide
-- [ ] Performance profiling under target constraints (1 vCPU, 1GB RAM, ~20 concurrent users)
-- [ ] Beta release
+| Release | Codename | Goal | Target |
+|---------|----------|------|--------|
+| **v0.1** | Ember | Backend skeleton + chat API (no frontend) | Apr 2026 |
+| **v0.2** | Kindling | Frontend shell + Campfire (fading chat) | Jun 2026 |
+| **v0.3** | Hearth Fire | Voice — The Portal (spatial audio) | Aug 2026 |
+| **v1.0** | First Light | Full MVP: chat + voice + Knock + deployment | Oct 2026 |
+| **v1.1** | Warm Glow | Polish, accessibility, admin tools | Dec 2026 |
+| **v2.0** | Open Flame | Cartridges (plugin system) + E2EE | Q1 2027 |
 
 ---
 

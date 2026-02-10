@@ -14,9 +14,10 @@ Hearth is a privacy-first, self-hosted, modular communication platform — a "Di
 |-------|-----------|-------|
 | Backend / API | **PocketBase** (Go + SQLite) | Auth, real-time DB, chat history, cron jobs |
 | Voice / Video | **LiveKit** (Go, WebRTC SFU) | Spatial audio, bandwidth mgmt, ICE Lite |
+| TLS / Proxy | **Caddy** | Auto-TLS (Let's Encrypt), reverse proxy for PB + LiveKit |
 | Frontend | **React + Vite + TailwindCSS** | TypeScript (strict mode) |
 | Plugins | **Extism** (Wasm) | Sandboxed WASM plugins for extensibility |
-| Deployment | **Single Docker Container** | Target: 1 vCPU, 1GB RAM |
+| Deployment | **Docker Compose** | Target: 1 vCPU, 1GB RAM |
 
 ## Architecture Constraints
 - **Memory budget is sacred.** PocketBase heap: ~250MB, LiveKit heap: ~400MB, Wasm pool: 50MB, OS+headroom: 200MB.
@@ -93,3 +94,10 @@ hearth/
 
 ## Current Phase
 **Research & Exploration** — Defining architecture, collecting research, stubbing out the design document. No production code yet.
+
+## Key Project Documents
+- **`vesta_master_plan.md`** — Master design & technical specification
+- **`docs/ROADMAP.md`** — Release roadmap with versioned milestones and task IDs
+- **`docs/RESEARCH_BACKLOG.md`** — Active research tasks and open questions
+- **`docs/research/`** — Technical and UX research reports
+- **`.github/agents/`** — Specialized agent roles (Builder, Researcher, Reviewer)
