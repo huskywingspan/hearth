@@ -11,6 +11,12 @@ import (
 // These are critical for Hearth's 1GB memory budget and concurrent read performance.
 func RegisterPragmas(app *pocketbase.PocketBase) {
 	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
+		// IMPORTANT: Call e.Next() FIRST to let PocketBase open the database.
+		// OnBootstrap fires before the DB is initialized — we apply pragmas after.
+		if err := e.Next(); err != nil {
+			return err
+		}
+
 		pragmas := []string{
 			"PRAGMA journal_mode=WAL",        // Non-blocking concurrent reads/writes
 			"PRAGMA synchronous=NORMAL",       // Fewer fsync; sufficient for app crashes
@@ -33,6 +39,6 @@ func RegisterPragmas(app *pocketbase.PocketBase) {
 			"busy_timeout", 5000,
 		)
 
-		return e.Next()
+		return nil
 	})
 }
