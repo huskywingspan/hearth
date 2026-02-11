@@ -157,8 +157,20 @@ func ensureRoomsCollection(app core.App) error {
 
 // ensureMessagesCollection creates the messages collection if it doesn't exist.
 func ensureMessagesCollection(app core.App) error {
-	_, err := app.FindCollectionByNameOrId("messages")
+	existing, err := app.FindCollectionByNameOrId("messages")
 	if err == nil {
+		// Collection exists — ensure new fields are present (schema migration)
+		changed := false
+		if existing.Fields.GetByName("author_name") == nil {
+			existing.Fields.Add(&core.TextField{
+				Name: "author_name",
+				Max:  50,
+			})
+			changed = true
+		}
+		if changed {
+			return app.Save(existing)
+		}
 		return nil
 	}
 
