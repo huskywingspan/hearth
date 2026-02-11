@@ -63,6 +63,20 @@ func RegisterAuth(app *pocketbase.PocketBase) {
 			e.Record.Set("type", "text")
 		}
 
+		// Denormalize author display_name onto the message (S3-004 / BUG-014)
+		// This avoids expand queries on read and fixes the "Wanderer" bug.
+		authorID := e.Record.GetString("author")
+		if authorID != "" {
+			author, authErr := e.App.FindRecordById("users", authorID)
+			if authErr == nil {
+				name := author.GetString("display_name")
+				if name == "" {
+					name = "Wanderer"
+				}
+				e.Record.Set("author_name", name)
+			}
+		}
+
 		return e.Next()
 	})
 

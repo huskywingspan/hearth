@@ -19,7 +19,7 @@
 | **Research Backlog** | ✅ Complete | 8 research tasks: R-001 through R-006 + R-008 ✅ complete. R-007 remaining (medium priority, blocks sound only). 7 open questions. |
 | **Agent Roles** | ✅ Complete | Builder, Researcher, Reviewer — specialized for Hearth |
 | **Backend (PocketBase)** | ✅ Complete | v0.1 Ember shipped. Auth, CRUD, GC, presence, HMAC, PoW, LiveKit JWT. 36/36 tests. |
-| **Frontend (React/Vite)** | ✅ Complete | v0.2 Kindling shipped. 27 files, 91KB gzipped, Subtle Warmth design system, Campfire chat. |
+| **Frontend (React/Vite)** | ✅ Complete | v0.2 Kindling + v0.2.1 Settling In shipped. Integration bugs fixed (BUG-012→016). |
 | **Voice (LiveKit)** | 🟡 Unblocked | R-005 (React SDK) + R-006 (Web Audio spatial) complete — ready for v0.3 |
 | **Docker Deployment** | ✅ Complete | PocketBase serves SPA via `pb_public/`. Standalone `Dockerfile.frontend` also available. |
 | **Plugin System (Extism)** | 🔲 Not Started | Scheduled for v2.0 |
@@ -27,6 +27,7 @@
 ### Current Milestone
 - **v0.1 — Ember** (Backend skeleton + chat API) — COMPLETE ✅
 - **v0.2 — Kindling** (Frontend + Campfire chat) — COMPLETE ✅
+- **v0.2.1 — Settling In** (Integration fixes + access model) — COMPLETE ✅ (incl. Sprint 3.1 review fixes)
 - Next: **v0.3 Hearth Fire** (Voice — The Portal) — Target: Aug 2026
 - Marketing prep: Post #1 (r/selfhosted concept pitch) targeted for end of v0.2 polish
 
@@ -87,6 +88,12 @@
 | 2026-02-11 | **Sprint 2 Spec** | `docs/specs/sprint-2-kindling.md` — 5 phases covering frontend scaffolding (Vite+React+TS+Tailwind), auth & SSE reconnect (SEC-005/SEC-006), Campfire chat (CSS decay engine, real-time messages, mumbling indicator, presence), mobile responsive layout, and Docker frontend build. ~13 days estimated. |
 | 2026-02-11 | **R-009 Initiated + Marketing Draft** | Pre-alpha marketing strategy formalized. Reddit post structure drafted (`docs/specs/marketing-reddit-draft.md`). Two-post plan: concept pitch at end of v0.2, "try it" post at v1.0. Target communities: r/selfhosted (primary), r/privacy, r/opensource, HN (deferred). Competitive response playbook for Matrix/Revolt/Mumble. Marketing phase (M-001–M-006) added to roadmap. |
 | 2026-02-11 | **Sprint 2 Implementation Complete (v0.2 Kindling)** | Builder delivered 27 files. Frontend shell: Vite + React 19 + TypeScript strict + Tailwind v4. Subtle Warmth design system fully implemented (dark + light mode, @fontsource fonts, pillow buttons, candlelight shadows). Campfire chat: SSE real-time subscription, 4-stage CSS fade (`campfire.css`), negative `animation-delay` for mid-fade page loads, `animationend` DOM cleanup, optimistic send with revert, time sync via Date header RTT/2, mumbling indicator (CSS bars), heartbeat presence (30s). Auth: `AuthProvider` context, token auto-refresh, `useReconnect` with `PB_CONNECT` resync (SEC-006 ✅). Code-splitting via `React.lazy` (K-024). PocketBase serves SPA from `pb_public/`. **Build:** `tsc --noEmit` clean, Vite 1.76s, ~91KB gzipped (under 150KB budget). **Deferred:** SEC-005 httpOnly cookies (PB SDK limitation), typing broadcast (needs backend topic), mobile drawer, error toasts, sound/foley (R-007). |
+| 2026-02-11 | **First LAN Testing — Integration Bug Cascade** | First hands-on two-device LAN test revealed 9 integration bugs (BUG-008→BUG-016). Root cause: frontend was built without running backend — field name mismatches, missing navigation, API rule chicken-and-egg problems, display name denormalization gap. Hotfixed BUG-008 through BUG-011 during debugging. BUG-012 through BUG-016 identified via full codebase audit. |
+| 2026-02-11 | **ADR-006: Simplified Access Model** | Proposed pre-v1.0 access rules: rooms visible to all authed users, self-join allowed, Knock system deferred to v1.0. Eliminates chicken-and-egg membership problems. |
+| 2026-02-11 | **Sprint 3 Spec Complete** | `docs/specs/sprint-3-settling-in.md` — 16 tasks across 3 phases. Addresses all 9 integration bugs. Introduces `author_name` denormalization on messages. Handed off to Builder. |
+| 2026-02-11 | **Sprint 3 Implementation Complete (v0.2.1 Settling In)** | All 14 code tasks done. **Backend:** Relaxed API rules (rooms/members list/view/create: any auth user — ADR-006), removed auto-join from both presence endpoints (now 403 on non-member), added `author_name` TextField to messages collection, denormalize display_name in OnRecordCreate hook. Sanitize.go already clean. **Frontend:** Removed duplicate room_members.create from RoomList, replaced room_members+expand query with direct rooms.getFullList, added ensureMembership() in CampfireRoom (join-on-entry with unique constraint catch), added author_name to Message interface + optimistic send, MessageBubble prefers author_name → expand fallback → 'Wanderer'. **Build:** `tsc --noEmit` zero errors, Vite build ~85KB gzipped JS (under 150KB). S3-020 LAN test pending. |
+| 2026-02-11 | **Sprint 3 Code Review (Reviewer Agent)** | Reviewer found 2 critical, 2 medium, 2 low issues. **Critical #1:** Builder had relaxed `messages` API rules to `@request.auth.id != ""`, violating ADR-006 spec ("Keep messages rules requiring membership"). **Critical #2:** Three sanitize tests still asserted HTML escaping behavior from pre-PIVOT-004. **Medium:** `room_members` had no `UpdateRule`. Sprint 3.1 spec created. |
+| 2026-02-11 | **Sprint 3.1 Review Fixes Complete** | Builder applied all 3 fixes from Reviewer. Messages API rules restored to require `room_members_via_room` membership (defense-in-depth). Three stale sanitize tests updated to assert passthrough (PIVOT-004 alignment). `room_members.UpdateRule` set to room-owner-only. All tests green, frontend builds clean. **Lesson:** The review→fix cycle caught a security regression that would have allowed any authed user to read/write messages to any room without joining. |
 
 ---
 
@@ -290,6 +297,24 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 
 ---
 
+### ADR-006: Simplified Access Model for Pre-v1.0
+
+**Date:** February 11, 2026 | **Status:** Proposed
+
+**Context:** First LAN testing revealed a chicken-and-egg problem: room visibility requires membership, but membership requires an invite flow that doesn't exist yet (scheduled for v1.0). Auto-join hacks in presence endpoints caused race conditions and duplicate key errors.
+
+**Decision:** For pre-v1.0, simplify access:
+- Rooms visible to all authenticated users (relaxed ListRule/ViewRule)
+- Any authenticated user can join any room (relaxed room_members CreateRule)
+- Messages still gated by membership (unchanged)
+- Frontend creates membership on room entry; presence endpoints require it
+
+**Revert Path:** When The Knock system lands in v1.0, re-tighten rules to require invite redemption or owner approval. Add `visibility` field on rooms (public vs. invite-only).
+
+**Rationale:** Hearth pre-v1.0 is a small self-hosted "living room" for friends. Access control beyond "you must be logged in" adds complexity without value at this stage.
+
+---
+
 ## Bug Registry
 
 | ID | Severity | Component | Title | Status | Date Found | Date Fixed |
@@ -301,6 +326,15 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 | BUG-005 | CRITICAL | `collections.go` | Rooms API rules reference `room_members_via_room` back-relation, but `room_members` collection doesn't exist yet during `rooms` creation. PocketBase validates rules during `Save()` and fails silently — collections never created. Fix: two-pass approach — create all collections without rules, then apply rules after all exist. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
 | BUG-006 | CRITICAL | `collections.go` | `RelationField.CollectionId` set to collection **name** (e.g. `"users"`, `"rooms"`) instead of the actual collection **ID**. PocketBase's `checkCollectionId` validator does `relCollection.Id != v` — so names always fail validation. `app.Save()` returns a validation error, collections silently never created. Fix: look up each collection by name at runtime and use `.Id`. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
 | BUG-007 | HIGH | `main.go` | PocketBase does **not** auto-serve `pb_public/` when used as a Go framework — only the prebuilt binary does. Root URL returned 404 JSON. Fix: register `GET /{path...}` route with `apis.Static(os.DirFS("./pb_public"), true)` in `OnServe` hook at priority 999. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-008 | MEDIUM | Frontend/Auth | Login fails — zero users in database after `pb_data` regeneration. Also masked by PowerShell escaping mangling JSON in curl tests. Fix: create user via API; PowerShell was red herring. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-009 | MEDIUM | `LoginForm.tsx` | Login succeeds but UI doesn't navigate. `LoginPage.tsx` had no redirect for authenticated state, `LoginForm.tsx` had no `navigate()` after successful auth. Fix: added `<Navigate to="/" />` and `navigate('/', { replace: true })`. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-010 | HIGH | `useMessages.ts` | Messages appear empty / fade instantly. Frontend `Message` interface used `text` field but backend collection uses `body`. Server-side TTL calc worked but messages had empty bodies. Fix: renamed `text` → `body` throughout frontend. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-011 | MEDIUM | `useMessages.ts` | Every message appears twice. Optimistic send adds message → `.create()` replaces temp → realtime subscription `create` fires for same record → duplicate. Fix: skip own-author creates in subscription handler + dedup by ID. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-012 | HIGH | `RoomList.tsx` | "Failed to create record" when creating campfire. Frontend creates `room_members` but backend `OnRecordAfterCreateSuccess("rooms")` hook already does → unique constraint violation. Fix: remove frontend `room_members.create()`. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-013 | MEDIUM | `presence.go` | Auto-join in presence endpoints races: heartbeat + poll both try concurrent auto-join → duplicate key. Fix: remove auto-join hacks; use explicit join-on-entry. Both endpoints now return 403 on non-member. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-014 | MEDIUM | `MessageBubble.tsx` | Display name shows "Wanderer" instead of real name. Realtime subscription records don't include `expand` data. Fix: denormalize `author_name` onto message records server-side. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-015 | HIGH | `RoomPage.tsx` | Room page 404 for non-members. `rooms.ViewRule` requires membership but membership doesn't exist on first visit. Fix: relax ViewRule to any authenticated user (ADR-006). | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-016 | HIGH | `useMessages.ts` | Message send fails if user isn't yet a member (race with auto-join). `messages.CreateRule` requires membership. Fix: relax to any auth user + explicit join-on-entry in CampfireRoom. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
 
 ---
 
@@ -320,6 +354,20 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 | Rate limiter uses sliding-window token bucket (in-memory) with 5-min sweep cron | No Redis needed. `sync.Mutex`-protected map. Memory bounded by sweep. 5 profiles: auth, invite, message, heartbeat, general. | ✅ 6 tests pass |
 | Input sanitization uses `html.EscapeString` (Go stdlib) — no external dependency | Lightweight, covers all HTML entity escaping. Applied to: message body, display_name, room name/description. Max 4000 chars. | ✅ 6 tests pass |
 
+### PIVOT-004: html.EscapeString Removed from Sanitizer (Debugging Session)
+
+**Date:** February 11, 2026
+
+**Context:** During the first LAN test, special characters like apostrophes displayed as `&#39;`. Server-side `html.EscapeString()` was converting `'` → `&#39;`, then React was not interpreting the entity — it rendered the literal text `&#39;`.
+
+**Root Cause:** Double-encoding. React's JSX already escapes content safely (treats values as text, not HTML). Server-side HTML escaping on top of React's built-in escaping produces visible entities in the UI.
+
+**Decision:** `SanitizeText()` now only enforces the length cap (4000 bytes). No character escaping. React handles output safety. `sanitizeRecordField()` also only enforces length.
+
+**Risk Assessment:** React's JSX is specifically designed to prevent XSS by not interpreting raw HTML. The remaining server-side length enforcement prevents oversized payloads. CSP `script-src 'self'` (SEC-003) provides defense-in-depth.
+
+**Lesson Learned:** When the frontend framework handles output escaping, server-side HTML escaping causes double-encoding. Only escape on the *output* boundary, not on storage.
+
 ## Builder Implementation Decisions (Sprint 2)
 
 > Design decisions Builder made during Sprint 2 (v0.2 Kindling) implementation.
@@ -336,6 +384,18 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 | `content-visibility: auto` + `contain-intrinsic-size: auto 80px` on messages | Per R-008: browser-native virtualization. Offscreen messages skip rendering entirely. Zero JS overhead. | ✅ R-008 validated |
 | Optimistic messages marked with `data-optimistic="true"` and `animation: none` | Prevents optimistic messages from fading before server confirms. Server-assigned `expires_at` triggers real fade after confirmation. | ✅ Spec pattern |
 | `useReconnect` fires `authRefresh()` before data resync on `PB_CONNECT` | Per R-004: reconnect events don't replay missed SSE messages. Auth must be re-validated first (SEC-006), then full state re-fetched. | ✅ SEC-006 resolved |
+
+## Builder Implementation Decisions (Sprint 3 / 3.1)
+
+> Design decisions Builder made during Sprint 3 (v0.2.1 Settling In) and review fixes.
+
+| Decision | Rationale | Verified |
+|----------|-----------|----------|
+| `ensureMembership()` inline in `CampfireRoom.tsx`, not a separate hook | Simple pattern — one `pb.collection('room_members').create()` on mount, catch-all for duplicate key. No need for separate hook until reuse emerges. | ✅ Builder's choice |
+| `CampfireRoom` split into outer guard + `CampfireRoomInner` | Outer component handles membership, shows loading pulse. Inner only mounts after `joined=true`. Prevents hooks from firing before membership exists. | ✅ Clean separation |
+| `author_name` populated in `OnRecordCreate("messages")` hook (same as TTL) | Keeps all server-side message enrichment in one place. Single DB read for author record per message create. | ✅ Minimal overhead |
+| Messages API rules restored to require membership (Sprint 3.1 — Reviewer catch) | Builder had initially relaxed to `@request.auth.id != ""` but ADR-006 spec explicitly required membership for messages. Reviewer caught the deviation. Defense-in-depth restored. | ✅ Security regression prevented |
+| `room_members.UpdateRule` added as owner-only (Sprint 3.1) | Schema completeness — no UI for role changes yet, but API should be secure by default. | ✅ Defensive schema |
 
 ---
 ## 🛡️ Security Concerns Tracker

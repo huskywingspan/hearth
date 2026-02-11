@@ -112,7 +112,7 @@ func RegisterPresence(app *pocketbase.PocketBase) {
 				return e.BadRequestError("room_id is required", nil)
 			}
 
-			// Verify user is a member of the room
+			// Verify user is a member of the room (no auto-join — ADR-006)
 			_, err := e.App.FindFirstRecordByFilter(
 				"room_members",
 				"room = {:room} && user = {:user}",
@@ -138,7 +138,7 @@ func RegisterPresence(app *pocketbase.PocketBase) {
 			info, _ := e.RequestInfo()
 			roomID := e.Request.PathValue("roomId")
 
-			// Verify membership
+			// Verify membership (no auto-join — ADR-006)
 			_, err := e.App.FindFirstRecordByFilter(
 				"room_members",
 				"room = {:room} && user = {:user}",

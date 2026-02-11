@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import pb from '@/lib/pocketbase';
 
 interface Room {
@@ -11,40 +11,59 @@ interface Room {
 
 /**
  * Room navigation sidebar.
- * Fetches rooms the user is a member of.
+ * Fetches all rooms (ADR-006: open-lobby model).
  */
 export function RoomList() {
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const navigate = useNavigate();
+
+  const fetchRooms = useCallback(async () => {
+    try {
+      // ADR-006: Any authenticated user can list all rooms
+      const result = await pb.collection('rooms').getFullList<Room>({
+        sort: 'name',
+      });
+      setRooms(result);
+    } catch {
+      // Will retry on reconnect
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchRooms() {
-      try {
-        // Fetch rooms the current user is a member of
-        const userId = pb.authStore.record?.id;
-        if (!userId) return;
-
-        const memberships = await pb
-          .collection('room_members')
-          .getFullList({
-            filter: `user = "${userId}"`,
-            expand: 'room',
-          });
-
-        const roomList = memberships
-          .map((m) => {
-            const expanded = m.expand as { room?: Room } | undefined;
-            return expanded?.room;
-          })
-          .filter((r): r is Room => !!r);
-
-        setRooms(roomList);
-      } catch {
-        // Will retry on reconnect
-      }
-    }
-
     fetchRooms();
-  }, []);
+  }, [fetchRooms]);
+
+  const handleCreateRoom = async () => {
+    const name = prompt('Name your campfire:');
+    if (!name?.trim()) return;
+
+    setIsCreating(true);
+    try {
+      const slug = name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      const room = await pb.collection('rooms').create({
+        name: name.trim(),
+        slug,
+        owner: pb.authStore.record?.id,
+        default_ttl: 3600,
+        max_participants: 10,
+        livekit_room_name: `hearth-${slug}-${Date.now()}`,
+      });
+
+      // Backend hook auto-creates owner membership (S3-010: no duplicate create)
+      await fetchRooms();
+      navigate(`/room/${room.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create room');
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   return (
     <nav className="flex flex-col h-full bg-[var(--color-bg-secondary)]">
@@ -78,6 +97,18 @@ export function RoomList() {
             </NavLink>
           ))
         )}
+
+        <button
+          onClick={handleCreateRoom}
+          disabled={isCreating}
+          className="w-full mt-2 px-3 py-2 rounded-[var(--radius-md)] text-sm
+            text-[var(--color-text-muted)] hover:text-[var(--color-accent-amber)]
+            hover:bg-[var(--color-bg-primary)] transition-colors duration-[var(--duration-fast)]
+            border border-dashed border-[var(--color-bg-elevated)] hover:border-[var(--color-accent-amber)]
+            disabled:opacity-50"
+        >
+          {isCreating ? '...' : '+ New campfire'}
+        </button>
       </div>
 
       <div className="p-4 border-t border-[var(--color-bg-elevated)]">

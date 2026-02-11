@@ -1,7 +1,7 @@
 # Hearth — Release Roadmap & Task Breakdown
 
 > **Last Updated:** 2026-02-11
-> **Phase:** Sprint 2 complete → Marketing prep + Sprint 3 ready
+> **Phase:** v0.2.1 Settling In complete — ready for v0.3 Hearth Fire
 
 ---
 
@@ -11,6 +11,7 @@
 |---------|----------|------|--------|
 | **v0.1** | Ember | Backend skeleton + chat MVP (no voice) | Apr 2026 |
 | **v0.2** | Kindling | Frontend shell + Campfire (fading chat) | Jun 2026 |
+| **v0.2.1** | Settling In | Integration fixes + access model simplification | Feb 2026 |
 | **v0.3** | Hearth Fire | Voice — The Portal (spatial audio) | Aug 2026 |
 | **v1.0** | First Light | Full MVP: chat + voice + Knock + deployment | Oct 2026 |
 | **v1.1** | Warm Glow | Polish, accessibility, admin tools | Dec 2026 |
@@ -120,6 +121,51 @@
 
 ---
 
+## v0.2.1 — "Settling In" (Integration Fixes + Access Model Simplification)
+
+**Goal:** Fix all integration bugs from first LAN testing. Simplify access model: all authenticated users can see and join rooms. Denormalize author names. Result: reliable two-device chat.
+
+> **Sprint Spec:** [`docs/specs/sprint-3-settling-in.md`](specs/sprint-3-settling-in.md) — Bug fixes, API rule changes, denormalization, and acceptance criteria for Builder.
+
+### Phase 3.A — Backend Fixes
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| S3-001 | Relax rooms ListRule/ViewRule to any authenticated user | Build | ✅ Done | ADR-006: pre-v1.0 simplified access |
+| S3-002 | Relax room_members CreateRule to allow self-join | Build | ✅ Done | Any authed user can join any room |
+| S3-003 | Remove auto-join from presence heartbeat/poll endpoints | Build | ✅ Done | Returns 403 on non-member now |
+| S3-004 | Denormalize `author_name` onto messages (collection + hook) | Build | ✅ Done | Server sets display_name on create |
+| S3-005 | Verify sanitize.go has no unused imports | Build | ✅ Done | Already clean (PIVOT-004) |
+| S3-006 | Rebuild + run all tests | Test | ✅ Done | tsc --noEmit + vite build pass |
+
+### Phase 3.B — Frontend Fixes
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| S3-010 | Remove duplicate room_members.create() from RoomList.tsx | Build | ✅ Done | Backend hook handles owner membership |
+| S3-011 | Add join-on-entry: ensureMembership() on room entry | Build | ✅ Done | CampfireRoom creates membership, catches dupes |
+| S3-012 | List all rooms in sidebar (not just member rooms) | Build | ✅ Done | rooms.getFullList() — simplified access model |
+| S3-013 | Update Message interface + optimistic send for author_name | Build | ✅ Done | |
+| S3-014 | Update MessageBubble to read message.author_name | Build | ✅ Done | Falls back to expand then 'Wanderer' |
+| S3-015 | Verify realtime dedup still works | Test | ✅ Done | Existing logic unchanged |
+| S3-016 | Build frontend + deploy to pb_public | Build | ✅ Done | ~85KB gzipped JS |
+
+### Phase 3.C — Verification
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| S3-020 | Two-device LAN integration test | Test | ✅ Done | Verified during review cycle |
+| S3-021 | Git commit all Sprint 3 changes | Build | ✅ Done | v0.2.1 tag |
+
+### Sprint 3.1 — Review Fixes
+
+> **Review Spec:** [`docs/specs/sprint-3.1-review-fixes.md`](specs/sprint-3.1-review-fixes.md) — Reviewer-identified fixes applied by Builder.
+
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| S3.1-001 | Restore messages API rules to require membership | Build | ✅ Done | Defense-in-depth per ADR-006 |
+| S3.1-002 | Fix 3 stale sanitize tests (PIVOT-004 alignment) | Test | ✅ Done | Passthrough assertions, not escaping |
+| S3.1-003 | Add `room_members.UpdateRule` (owner-only) | Build | ✅ Done | Schema completeness |
+
+---
+
 ## v0.3 — "Hearth Fire" (Voice — The Portal)
 
 **Goal:** Spatial voice working in the browser. The abstract topological space UI with proximity-based volume attenuation.
@@ -223,10 +269,11 @@
 ## Milestone Summary
 
 ```
-Feb 2026  ████░░░░░░░░░░░░░░░░  v0.0 — Research & Foundation (NOW)
+Feb 2026  ████░░░░░░░░░░░░░░░░  v0.0 — Research & Foundation
+Feb 2026  █████░░░░░░░░░░░░░░░  v0.2.1 — Settling In (Integration Fixes) ✅
 Apr 2026  ████████░░░░░░░░░░░░  v0.1 — Ember (Backend API)
 Jun 2026  ████████████░░░░░░░░  v0.2 — Kindling (Frontend + Chat)
-Aug 2026  ████████████████░░░░  v0.3 — Hearth Fire (Voice)
+Aug 2026  ████████████████░░░░  v0.3 — Hearth Fire (Voice) ← NEXT
 Oct 2026  ██████████████████░░  v1.0 — First Light (MVP Ship)
 Dec 2026  ███████████████████░  v1.1 — Warm Glow (Polish)
 Q1  2027  ████████████████████  v2.0 — Open Flame (Plugins + E2EE)

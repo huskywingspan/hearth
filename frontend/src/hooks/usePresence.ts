@@ -39,7 +39,7 @@ export function usePresence(roomId: string) {
           method: 'GET',
         });
         setPresentUsers(
-          (data as { users?: PresenceEntry[] }).users ?? []
+          (data as { online?: PresenceEntry[] }).online ?? []
         );
       } catch {
         /* noop */

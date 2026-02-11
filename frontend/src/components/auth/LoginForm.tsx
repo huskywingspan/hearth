@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
@@ -10,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
  */
 export function LoginForm() {
   const { login, register } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +30,7 @@ export function LoginForm() {
       } else {
         await register(email, password, displayName || email.split('@')[0]!);
       }
+      navigate('/', { replace: true });
     } catch (err) {
       setError(
         err instanceof Error

@@ -5,9 +5,10 @@ import { MESSAGE_PAGE_SIZE } from '@/lib/constants';
 
 export interface Message {
   id: string;
-  text: string;
+  body: string;
   room: string;
   author: string;
+  author_name: string;
   expires_at: string;
   created: string;
   expand?: {
@@ -56,7 +57,13 @@ export function useMessages(roomId: string) {
 
         switch (data.action) {
           case 'create':
-            setMessages((prev) => [...prev, data.record]);
+            setMessages((prev) => {
+              // Skip own messages — the optimistic send flow handles them
+              if (data.record.author === pb.authStore.record?.id) return prev;
+              // Also deduplicate by id just in case
+              if (prev.some((m) => m.id === data.record.id)) return prev;
+              return [...prev, data.record];
+            });
             break;
           case 'update':
             setMessages((prev) =>
@@ -91,10 +98,11 @@ export function useMessages(roomId: string) {
       const tempId = `temp-${Date.now()}`;
       const optimistic: Message = {
         id: tempId,
-        text,
+        body: text,
         room: roomId,
         author: pb.authStore.record?.id ?? '',
-        expires_at: new Date(Date.now() + 300_000).toISOString(), // 5 min default
+        author_name: pb.authStore.record?.['display_name'] ?? 'Wanderer',
+        expires_at: new Date(Date.now() + 300_000).toISOString(), // 5 min placeholder
         created: new Date().toISOString(),
       };
 
@@ -103,9 +111,10 @@ export function useMessages(roomId: string) {
 
       try {
         const real = await pb.collection('messages').create<Message>({
-          text,
+          body: text,
           room: roomId,
-          // Server enforces expires_at via TTL field
+          author: pb.authStore.record?.id,
+          // Server enforces expires_at via TTL hook
         });
         // Replace optimistic with real record
         setMessages((prev) =>

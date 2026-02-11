@@ -557,11 +557,10 @@ func TestSanitizeScriptTag(t *testing.T) {
 	input := `<script>alert('xss')</script>`
 	result := SanitizeText(input)
 
-	if strings.Contains(result, "<script>") {
-		t.Error("script tag should be escaped")
-	}
-	if !strings.Contains(result, "&lt;script&gt;") {
-		t.Errorf("expected escaped script tag, got: %s", result)
+	// PIVOT-004: No server-side HTML escaping — React handles output safety.
+	// SanitizeText only enforces length.
+	if result != input {
+		t.Errorf("SanitizeText should not modify HTML (React handles escaping)\ngot:  %s\nwant: %s", result, input)
 	}
 }
 
@@ -569,11 +568,9 @@ func TestSanitizeHTMLEntities(t *testing.T) {
 	input := `<img src="x" onerror="alert(1)">`
 	result := SanitizeText(input)
 
-	if strings.Contains(result, "<img") {
-		t.Error("img tag should be escaped")
-	}
-	if !strings.Contains(result, "&lt;img") {
-		t.Errorf("expected escaped img tag, got: %s", result)
+	// PIVOT-004: No server-side HTML escaping — React handles output safety.
+	if result != input {
+		t.Errorf("SanitizeText should not modify HTML (React handles escaping)\ngot:  %s\nwant: %s", result, input)
 	}
 }
 
@@ -603,9 +600,9 @@ func TestSanitizeAmperstand(t *testing.T) {
 	input := "this & that < those > them"
 	result := SanitizeText(input)
 
-	expected := "this &amp; that &lt; those &gt; them"
-	if result != expected {
-		t.Errorf("HTML entities should be escaped\ngot:  %s\nwant: %s", result, expected)
+	// PIVOT-004: No server-side HTML escaping — React handles output safety.
+	if result != input {
+		t.Errorf("SanitizeText should not modify special chars (React handles escaping)\ngot:  %s\nwant: %s", result, input)
 	}
 }
 

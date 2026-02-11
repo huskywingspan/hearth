@@ -204,6 +204,11 @@ func ensureMessagesCollection(app core.App) error {
 		MaxSelect: 1,
 	})
 
+	collection.Fields.Add(&core.TextField{
+		Name: "author_name",
+		Max:  50,
+	})
+
 	collection.Fields.Add(&core.DateField{
 		Name:     "expires_at",
 		Required: true,
@@ -281,8 +286,9 @@ func applyAPIRules(app core.App) error {
 	if err != nil {
 		return fmt.Errorf("rooms not found for rules: %w", err)
 	}
-	rooms.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room_members_via_room.user`)
-	rooms.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room_members_via_room.user`)
+	// ADR-006: Any authenticated user can list/view rooms (open-lobby model)
+	rooms.ListRule = stringPtr(`@request.auth.id != ""`)
+	rooms.ViewRule = stringPtr(`@request.auth.id != ""`)
 	rooms.CreateRule = stringPtr(`@request.auth.id != ""`)
 	rooms.UpdateRule = stringPtr(`@request.auth.id = owner`)
 	rooms.DeleteRule = stringPtr(`@request.auth.id = owner`)
@@ -295,6 +301,7 @@ func applyAPIRules(app core.App) error {
 	if err != nil {
 		return fmt.Errorf("messages not found for rules: %w", err)
 	}
+	// ADR-006: Messages require room membership (defense-in-depth)
 	messages.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
 	messages.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
 	messages.CreateRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
@@ -309,9 +316,11 @@ func applyAPIRules(app core.App) error {
 	if err != nil {
 		return fmt.Errorf("room_members not found for rules: %w", err)
 	}
-	members.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
-	members.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
-	members.CreateRule = stringPtr(`@request.auth.id != "" && @request.auth.id = room.owner`)
+	members.ListRule = stringPtr(`@request.auth.id != ""`)
+	members.ViewRule = stringPtr(`@request.auth.id != ""`)
+	// ADR-006: Any auth user can create membership (self-join)
+	members.CreateRule = stringPtr(`@request.auth.id != ""`)
+	members.UpdateRule = stringPtr(`@request.auth.id = room.owner`)
 	members.DeleteRule = stringPtr(`@request.auth.id = room.owner || @request.auth.id = user`)
 	if err := app.Save(members); err != nil {
 		return fmt.Errorf("room_members rules: %w", err)

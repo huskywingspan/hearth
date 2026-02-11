@@ -49,7 +49,7 @@ export function MessageBubble({ message, onGone }: Props) {
   } as CSSProperties;
 
   const authorName =
-    message.expand?.author?.display_name ?? 'Wanderer';
+    message.author_name || message.expand?.author?.display_name || 'Wanderer';
 
   return (
     <div
@@ -63,7 +63,7 @@ export function MessageBubble({ message, onGone }: Props) {
           {authorName}
         </span>
         <span className="text-[var(--color-text-primary)] text-base break-words min-w-0">
-          {message.text}
+          {message.body}
         </span>
       </div>
     </div>

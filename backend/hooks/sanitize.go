@@ -1,8 +1,6 @@
 package hooks
 
 import (
-	"html"
-
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -52,21 +50,21 @@ func RegisterSanitize(app *pocketbase.PocketBase) {
 	})
 }
 
-// SanitizeText HTML-escapes text and enforces the max length.
-// Turns <script>alert(1)</script> into &lt;script&gt;alert(1)&lt;/script&gt;
-// Uses Go's html.EscapeString (standard library, handles all HTML entities correctly).
+// SanitizeText enforces the max length on user input.
+// We do NOT html-escape here because React renders text content safely
+// via JSX (treats values as text, not HTML). HTML-escaping server-side
+// causes double-encoding (e.g., ' becomes &#39; displayed literally).
 func SanitizeText(input string) string {
-	sanitized := html.EscapeString(input)
-	if len(sanitized) > maxMessageLength {
-		sanitized = sanitized[:maxMessageLength]
+	if len(input) > maxMessageLength {
+		return input[:maxMessageLength]
 	}
-	return sanitized
+	return input
 }
 
-// sanitizeRecordField escapes HTML in a specific record field (if non-empty).
+// sanitizeRecordField enforces length limit on a specific record field (if non-empty).
 func sanitizeRecordField(record *core.Record, field string) {
 	value := record.GetString(field)
-	if value != "" {
-		record.Set(field, html.EscapeString(value))
+	if value != "" && len(value) > maxMessageLength {
+		record.Set(field, value[:maxMessageLength])
 	}
 }
