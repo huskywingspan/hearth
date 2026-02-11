@@ -113,6 +113,49 @@ Hearth is not competing with Discord for millions of users. Hearth competes with
 
 ---
 
+## 1.2 DESIGN PHILOSOPHY — "BUILD IT LIKE APPLE WOULD"
+
+> Hearth is a **design challenge**, not just an engineering challenge. A stellar backend with technically excellent code is table stakes. What makes Hearth succeed or fail is the **emotional relationship** the user builds with the app itself.
+
+### The Imperative
+
+Word-of-mouth is not a nice-to-have — it is the **only viable marketing strategy** for a self-hosted privacy tool built by one person. Users will not recommend Hearth because it has good WebRTC configuration. They will recommend it because it made them *feel something*. The moments of delight, familiarity, and quiet surprise are what turn a user into an evangelist.
+
+### Design Over Engineering
+
+Every technical decision exists in service of the experience. The CSS decay engine matters because fading text *feels* like memory softening. The spatial audio matters because hearing someone "walk closer" creates intimacy. The Knock matters because arriving somewhere should feel like arriving *somewhere* — not clicking a button.
+
+**The frontend is not a skin over the backend. It is the product.**
+
+### Emotional Design Principles
+
+| Principle | Meaning | Example |
+|----------|---------|--------|
+| **Familiarity** | The app should feel like a place you've been before — warm, lived-in, safe | Soft shadows, warm palette, organic sounds, rounded shapes |
+| **Discovery** | Small moments of delight that reward curiosity and long-term use | A crackling fireplace you discover by clicking it. Hidden interactions. |
+| **Seasonality** | The app is alive — it breathes, it changes, it notices the passage of time | Ambient lighting shifts subtly with seasons. You won't notice for 6 months. |
+| **Shared Wonder** | Discoveries are better when shared — design moments that become social | "Wait, did you guys see that?" in a voice Den with 10 people |
+| **Nostalgia** | Evoke the feeling of a place you miss — a childhood living room, a late-night dorm, a cabin | Typography, color temperature, sound design, pacing |
+
+### Delight Moments (Seed Ideas)
+
+These are not spec'd for any milestone — they are a **design backlog** of small surprises to weave into the experience over time:
+
+- **The Fireplace:** A subtle animated hearth somewhere in the House UI. Click it — it crackles. Click again — it dims. A tiny interaction that serves no function except warmth.
+- **Seasonal Ambience:** The background hue, shadow warmth, or ambient sound shifts imperceptibly across months. Spring is slightly brighter. Winter is slightly warmer. A user who's been on Hearth for 6 months suddenly notices.
+- **Rain on the Window:** An ambient weather layer that occasionally appears — soft rain sounds, a gentle visual overlay. Not functional. Just *alive*.
+- **The Welcome Mat:** First time entering a Den, something subtle acknowledges you — a soft chime, a brief glow, a message that says "first visit." Your presence mattered.
+- **Anniversary Moments:** "You've been in this House for one year." Not a badge. A quiet, personal acknowledgment.
+- **Sound Easter Eggs:** Secret sound variations — one in fifty button clicks makes a slightly different thock. Subconscious texture.
+
+### The Test
+
+> **Would you tell your friend about this?** Not "would you recommend this app" — would you *text your friend* to say "dude, click the fireplace"? That text message is the entire marketing strategy.
+
+The technical excellence of the backend is what allows us to be *confident* while we obsess over the experience. The 1GB constraint, the SQLite pragmas, the HMAC tokens — those are the foundation that lets us spend our creative energy where it matters: making someone feel at home.
+
+---
+
 ## 2. THE TECH STACK
 
 | Layer | Technology | Role |
