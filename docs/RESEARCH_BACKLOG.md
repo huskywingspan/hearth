@@ -1,11 +1,17 @@
 # Hearth — Research Backlog & Open Questions
 
-> **Last Updated:** 2026-02-10
+> **Last Updated:** 2026-02-10 (R-003 through R-006 completed)
 > **Owner:** Researcher Agent
 
 ---
 
-## Active Research Tasks
+## Completed Research Tasks
+
+> All high-priority research (R-001 through R-006) is now complete. Backend, frontend SDK, deployment, and spatial audio are unblocked.
+
+---
+
+## Remaining Research Tasks
 
 ### R-001: PocketBase v0.23+ API Verification ✅ COMPLETE
 **Priority:** Critical | **Blocks:** E-004, E-010 through E-015
@@ -17,33 +23,25 @@
 **Status:** Complete — 2026-02-10 | **Report:** [`docs/research/R-002-caddy-livekit-tls-config.md`](research/R-002-caddy-livekit-tls-config.md)
 **Outcome:** Major discovery — LiveKit's official deployment uses a **custom Caddy build** (`livekit/caddyl4`) with Layer 4 TLS SNI routing, NOT a standard Caddyfile. Config is YAML, not Caddyfile syntax. Architecture: Caddy listens :443, routes by SNI to TURN (localhost:5349), LiveKit API (localhost:7880), and PocketBase (localhost:8090). All containers use `network_mode: "host"`. Three subdomains: `hearth.example` / `lk.hearth.example` / `turn.hearth.example`. **Redis is NOT required for single-node** (saves ~25MB RAM). Complete `caddy.yaml`, `livekit.yaml`, and `docker-compose.yaml` templates provided. Q-008 resolved. **Docker deployment is now unblocked.**
 
-### R-003: Container Topology Decision (ADR-001)
+### R-003: Container Topology Decision (ADR-001) ✅ COMPLETE
 **Priority:** High | **Blocks:** E-005
-**Question:** Single container (supervisor process) vs. Docker Compose (3 containers: PocketBase + LiveKit + Caddy)?
-**Context:** The master plan says "Single Docker Container" but the actual deployment likely needs 3 processes (PocketBase, LiveKit, Caddy). Options:
-1. **Single container** with supervisord/s6-overlay running all 3 processes — simplest UX for self-hosters (`docker run` one thing)
-2. **Docker Compose** with 3 containers — cleaner process isolation, standard Docker practice, but more complex setup
-3. **Hybrid** — PocketBase + Caddy in one container, LiveKit in host network mode (needed for UDP perf)
-**Deliverable:** ADR-001 with recommendation.
+**Status:** Complete — 2026-02-10 | **Report:** [`docs/research/R-003-container-topology.md`](research/R-003-container-topology.md)
+**Outcome:** ADR-001 formally accepted. **Docker Compose with 3 containers, all `network_mode: "host"`.** Pre-resolved by R-002 findings — LiveKit's official deployment uses this exact pattern. Single container approach (PIVOT-001) formally retired. Options evaluated: single container + s6-overlay (rejected: non-standard, harder to debug), Docker Compose (accepted: standard practice, clean isolation), hybrid (rejected: mixed networking modes). Self-hoster UX: `git clone && cp .env.example .env && docker compose up -d`.
 
-### R-004: PocketBase JS SDK — Real-time Subscriptions
+### R-004: PocketBase JS SDK — Real-time Subscriptions ✅ COMPLETE
 **Priority:** High | **Blocks:** K-002, K-010
-**Question:** How does the PocketBase JavaScript SDK handle real-time record subscriptions, auth token refresh, and reconnection?
-**Deliverable:** Integration guide for React with patterns for hooks, subscription cleanup, and optimistic updates.
+**Status:** Complete — 2026-02-10 | **Report:** [`docs/research/R-004-pocketbase-js-sdk.md`](research/R-004-pocketbase-js-sdk.md)
+**Outcome:** SSE-based realtime (NOT WebSocket). Auto-reconnect with backoff `[200,300,500,1000,1200,1500,2000]ms`, `maxReconnectAttempts: Infinity`. `PB_CONNECT` event fires on every connect/reconnect — use for state resync. React patterns: `useRealtimeMessages` hook with cleanup, `AuthProvider` context with auto-refresh, optimistic updates with revert. Custom topic subscriptions for presence. `onDisconnect` callback for connection loss detection. Auto-cancellation of duplicate requests (use `requestKey` to disable).
 
-### R-005: LiveKit React SDK — Connection Lifecycle
+### R-005: LiveKit React SDK — Connection Lifecycle ✅ COMPLETE
 **Priority:** High | **Blocks:** H-001, H-003
-**Question:** What's the current LiveKit React SDK (`@livekit/components-react`) API for room connection, track management, and spatial audio configuration?
-**Deliverable:** Integration guide covering connection, publish/subscribe, and audio processing hooks.
+**Status:** Complete — 2026-02-10 | **Report:** [`docs/research/R-005-livekit-react-sdk.md`](research/R-005-livekit-react-sdk.md)
+**Outcome:** Two coexisting API surfaces: `LiveKitRoom` (stable — use this) and `SessionProvider`/`useSession` (beta, agent-focused). Key hooks: `useTracks`, `useParticipants`, `useRemoteParticipants`, `useIsSpeaking`, `useConnectionState`. **Critical spatial audio discovery:** `RemoteAudioTrack.setWebAudioPlugins(nodes: AudioNode[])` (experimental) injects custom Web Audio nodes into LiveKit's internal pipeline (`MediaStreamSource → [plugins] → GainNode → destination`). Custom `PortalAudioRenderer` pattern replaces `RoomAudioRenderer` (which MUST NOT be used for Portal — it renders all audio as default `<audio>` elements). `createAudioAnalyser()` utility for Ember glow visualization.
 
-### R-006: Web Audio API — Spatial Audio for 2D Canvas
+### R-006: Web Audio API — Spatial Audio for 2D Canvas ✅ COMPLETE
 **Priority:** High | **Blocks:** H-002, H-005
-**Question:** How to implement proximity-based volume attenuation using Web Audio API's PannerNode or GainNode controlled by 2D canvas position?
-**Context:** We need distance → gain mapping, not full 3D HRTF. Options:
-- Simple GainNode with linear/exponential rolloff based on Euclidean distance
-- PannerNode with `distanceModel: 'inverse'` in a flattened 3D space
-- Custom curve: `volume = 1 - clamp(distance / maxRange, 0, 1)` with smoothing
-**Deliverable:** Prototype + recommended approach.
+**Status:** Complete — 2026-02-10 | **Report:** [`docs/research/R-006-web-audio-spatial.md`](research/R-006-web-audio-spatial.md)
+**Outcome:** **PannerNode with `distanceModel: 'linear'`** — the only distance model that reaches actual silence at `maxDistance` (critical for "out of hearing range"). Formula: `gain = 1 - rolloffFactor × (distance - refDistance) / (maxDistance - refDistance)`. `panningModel: 'equalpower'` for stereo (cheaper than HRTF). Z=0 for 2D canvas. Canvas pixels as audio coordinate units directly (`refDistance: 50px`, `maxDistance: 500px`, `rolloffFactor: 1`). Complete `useSpatialAudio` hook with per-participant audio chains. Integration via `RemoteAudioTrack.setWebAudioPlugins([pannerNode])` — plugs directly into R-005 findings. Ember glow via `AnalyserNode` with `cloneTrack: true`. Performance: ~2% CPU at 20 participants (Safari needs `webkitAudioContext` polyfill).
 
 ### R-007: Organic Sound Library — Foley Sources
 **Priority:** Medium | **Blocks:** K-020, K-021
@@ -124,3 +122,7 @@
 |----|-------|---------------|---------|
 | R-001 | PocketBase v0.23+ API Verification | 2026-02-10 | PocketBase v0.36.2 API fully documented. Deprecated→current migration table. 10 verified code patterns. Backend unblocked. |
 | R-002 | Caddy + LiveKit TLS Configuration | 2026-02-10 | Layer 4 TLS SNI routing via custom Caddy build. YAML config (not Caddyfile). Host networking for all containers. Redis-free single-node. Complete deployment templates. |
+| R-003 | Container Topology ADR-001 | 2026-02-10 | Docker Compose with 3 containers, all `network_mode: "host"`. ADR-001 formally accepted. PIVOT-001 retired. |
+| R-004 | PocketBase JS SDK Real-time | 2026-02-10 | SSE-based realtime, auto-reconnect, PB_CONNECT resync. React hooks for subscriptions, auth, optimistic updates. |
+| R-005 | LiveKit React SDK Lifecycle | 2026-02-10 | Two API surfaces (LiveKitRoom stable, SessionProvider beta). `RemoteAudioTrack.setWebAudioPlugins()` for spatial audio. Custom PortalAudioRenderer pattern. |
+| R-006 | Web Audio Spatial Audio (2D) | 2026-02-10 | PannerNode linear distance model, equalpower panning, Z=0 for 2D. Complete `useSpatialAudio` hook. ~2% CPU at 20 participants. |
