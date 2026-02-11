@@ -1,7 +1,7 @@
 # Hearth — Release Roadmap & Task Breakdown
 
-> **Last Updated:** 2026-02-10
-> **Phase:** Research & Exploration
+> **Last Updated:** 2026-02-11
+> **Phase:** Research & Exploration → Sprint 1 ready
 
 ---
 
@@ -22,12 +22,14 @@
 
 **Goal:** A running PocketBase instance with optimized SQLite, basic auth, message CRUD with expiry, and HMAC invite tokens. No frontend — API-only. Proves the data layer works within the 1GB budget.
 
+> **Sprint Spec:** [`docs/specs/sprint-1-ember.md`](specs/sprint-1-ember.md) — Detailed phases, subtasks, code patterns, and acceptance criteria for Builder.
+
 ### Phase 0.1.A — Project Scaffolding
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| E-001 | Research: Verify PocketBase v0.23+ API (hooks, DB access, cron) | Research | Not Started | Gemini's code uses deprecated `app.Dao()` / `OnBeforeServe()` |
-| E-002 | Research: Caddy reverse proxy config for PocketBase + LiveKit TLS | Research | Not Started | Gemini identified SSL gap — WebRTC requires HTTPS/WSS |
-| E-003 | ADR-001: Container topology (single vs. multi-container Docker Compose) | Research | Not Started | Single container vs. compose with Caddy sidecar |
+| E-001 | Research: Verify PocketBase v0.23+ API (hooks, DB access, cron) | Research | ✅ Done | R-001 complete. See [`R-001`](research/R-001-pocketbase-api-verification.md) |
+| E-002 | Research: Caddy reverse proxy config for PocketBase + LiveKit TLS | Research | ✅ Done | R-002 complete. See [`R-002`](research/R-002-caddy-livekit-tls-config.md) |
+| E-003 | ADR-001: Container topology (single vs. multi-container Docker Compose) | Research | ✅ Done | R-003 complete. ADR-001 accepted. See [`R-003`](research/R-003-container-topology.md) |
 | E-004 | Scaffold Go backend project (`backend/main.go`, `go.mod`) | Build | Not Started | |
 | E-005 | Create `docker-compose.yml` with memory constraints | Build | Not Started | `GOMEMLIMIT` enforced per service |
 | E-006 | Create Caddyfile for reverse proxy + auto-TLS | Build | Not Started | Routes: API (`:8090`) + LiveKit WS (`:7880`) |
@@ -71,7 +73,7 @@
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
 | K-001 | Research: Vite + React + TailwindCSS project config (TS strict) | Research | Not Started | |
-| K-002 | Research: PocketBase JS SDK — real-time subscriptions, auth | Research | Not Started | |
+| K-002 | Research: PocketBase JS SDK — real-time subscriptions, auth | Research | ✅ Done | R-004 complete. See [`R-004`](research/R-004-pocketbase-js-sdk.md) |
 | K-003 | Scaffold `frontend/` (Vite, React, TailwindCSS, TypeScript strict) | Build | Not Started | |
 | K-004 | Implement design tokens: Subtle Warmth palette, typography, spacing | Build | Not Started | Tailwind config + CSS custom properties |
 | K-005 | Component library: Button (pillow), Card, Input, Avatar | Build | Not Started | Rounded, soft shadows, squash & stretch |
@@ -107,8 +109,8 @@
 ### Phase 0.3.A — LiveKit Integration
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| H-001 | Research: LiveKit client SDK (React) — connection, tracks, events | Research | Not Started | |
-| H-002 | Research: Web Audio API spatial audio (PannerNode, HRTF) | Research | Not Started | |
+| H-001 | Research: LiveKit client SDK (React) — connection, tracks, events | Research | ✅ Done | R-005 complete. See [`R-005`](research/R-005-livekit-react-sdk.md) |
+| H-002 | Research: Web Audio API spatial audio (PannerNode, HRTF) | Research | ✅ Done | R-006 complete. PannerNode linear model. See [`R-006`](research/R-006-web-audio-spatial.md) |
 | H-003 | LiveKit client connection + room join flow | Build | Not Started | |
 | H-004 | Audio track publish/subscribe | Build | Not Started | DTX + Opus DRED config |
 | H-005 | Proximity-based volume attenuation (distance → gain) | Build | Not Started | |

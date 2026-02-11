@@ -79,6 +79,7 @@
 | 2026-02-10 | **R-004 Complete** | PocketBase JS SDK integration guide. SSE-based realtime (NOT WebSocket), auto-reconnect with backoff, PB_CONNECT resync event. React hooks for subscriptions, auth provider, optimistic updates. |
 | 2026-02-10 | **R-005 Complete** | LiveKit React SDK guide. Two API surfaces: `LiveKitRoom` (stable) and `SessionProvider` (beta). **Key discovery:** `RemoteAudioTrack.setWebAudioPlugins()` — experimental API to inject Web Audio nodes into LiveKit's audio pipeline. Custom `PortalAudioRenderer` pattern (must NOT use `RoomAudioRenderer` for Portal). |
 | 2026-02-10 | **R-006 Complete** | Web Audio spatial audio for 2D canvas. `PannerNode` with `linear` distanceModel (only model that reaches true silence). `equalpower` panning, Z=0 for 2D. Complete `useSpatialAudio` hook. ~2% CPU at 20 participants. Ember glow via `AnalyserNode`. |
+| 2026-02-11 | **Sprint 1 Spec** | `docs/specs/sprint-1-ember.md` — 4 phases, 20 subtasks for Builder. Covers scaffolding, data layer (collections, GC, presence), auth & security (HMAC, PoW, LiveKit JWT), observability (metrics, logging), and testing. |
 
 ---
 
