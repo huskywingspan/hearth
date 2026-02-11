@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -418,4 +420,279 @@ func solvePoW(challengeID string, difficulty int) string {
 		}
 	}
 	return ""
+}
+
+// =============================================================================
+// Security Tests — E-042 Rate Limiting
+// =============================================================================
+
+func TestRateLimiterAllow(t *testing.T) {
+	rl := NewRateLimiter()
+	config := RateLimitConfig{MaxTokens: 3, RefillRate: 0.0} // no refill
+
+	// First 3 should pass
+	for i := 0; i < 3; i++ {
+		if !rl.Allow("test-key", config) {
+			t.Errorf("request %d should be allowed", i+1)
+		}
+	}
+
+	// 4th should be rejected
+	if rl.Allow("test-key", config) {
+		t.Error("4th request should be rate limited")
+	}
+}
+
+func TestRateLimiterRefill(t *testing.T) {
+	rl := NewRateLimiter()
+	config := RateLimitConfig{MaxTokens: 2, RefillRate: 100.0} // fast refill for test
+
+	// Drain tokens
+	rl.Allow("test-key", config)
+	rl.Allow("test-key", config)
+
+	// Should be empty now with 0 refill
+	if rl.Allow("test-key", RateLimitConfig{MaxTokens: 2, RefillRate: 0}) {
+		t.Error("should be rate limited when no refill")
+	}
+
+	// But with fast refill rate, tokens should be available
+	// (the time elapsed since last check will refill)
+	time.Sleep(50 * time.Millisecond)
+	if !rl.Allow("test-key", config) {
+		t.Error("should be allowed after refill time")
+	}
+}
+
+func TestRateLimiterSweepStale(t *testing.T) {
+	rl := NewRateLimiter()
+	config := RateLimitConfig{MaxTokens: 10, RefillRate: 1.0}
+
+	rl.Allow("fresh-key", config)
+
+	// Manually age a bucket
+	rl.mu.Lock()
+	rl.buckets["stale-key"] = &rateBucket{
+		tokens:    5,
+		lastCheck: time.Now().Add(-20 * time.Minute),
+		maxTokens: 10,
+		refillRate: 1.0,
+	}
+	rl.mu.Unlock()
+
+	removed := rl.SweepStale(10 * time.Minute)
+	if removed != 1 {
+		t.Errorf("expected 1 stale bucket removed, got %d", removed)
+	}
+
+	if rl.BucketCount() != 1 {
+		t.Errorf("expected 1 remaining bucket, got %d", rl.BucketCount())
+	}
+}
+
+func TestRateLimiterIsolation(t *testing.T) {
+	rl := NewRateLimiter()
+	config := RateLimitConfig{MaxTokens: 2, RefillRate: 0}
+
+	// Drain key-A
+	rl.Allow("key-A", config)
+	rl.Allow("key-A", config)
+
+	// key-B should still be allowed
+	if !rl.Allow("key-B", config) {
+		t.Error("key-B should not be affected by key-A's rate limit")
+	}
+}
+
+func TestRateLimiterConcurrency(t *testing.T) {
+	rl := NewRateLimiter()
+	config := RateLimitConfig{MaxTokens: 1000, RefillRate: 0}
+
+	var wg sync.WaitGroup
+	allowed := int64(0)
+	var mu sync.Mutex
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			key := fmt.Sprintf("concurrent-key-%d", id%10)
+			if rl.Allow(key, config) {
+				mu.Lock()
+				allowed++
+				mu.Unlock()
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// All 100 should have been allowed (1000 tokens across 10 keys = 100 each)
+	if allowed != 100 {
+		t.Errorf("expected 100 allowed, got %d", allowed)
+	}
+}
+
+func TestRateLimitAuthProfile(t *testing.T) {
+	rl := NewRateLimiter()
+
+	// Auth limit: 5 per 15 minutes (very low refill)
+	for i := 0; i < 5; i++ {
+		if !rl.Allow("auth:192.168.1.1", rateLimitAuth) {
+			t.Errorf("auth request %d should be allowed", i+1)
+		}
+	}
+
+	// 6th should be blocked
+	if rl.Allow("auth:192.168.1.1", rateLimitAuth) {
+		t.Error("6th auth request should be rate limited")
+	}
+}
+
+// =============================================================================
+// Security Tests — E-043 Input Sanitization
+// =============================================================================
+
+func TestSanitizeScriptTag(t *testing.T) {
+	input := `<script>alert('xss')</script>`
+	result := SanitizeText(input)
+
+	if strings.Contains(result, "<script>") {
+		t.Error("script tag should be escaped")
+	}
+	if !strings.Contains(result, "&lt;script&gt;") {
+		t.Errorf("expected escaped script tag, got: %s", result)
+	}
+}
+
+func TestSanitizeHTMLEntities(t *testing.T) {
+	input := `<img src="x" onerror="alert(1)">`
+	result := SanitizeText(input)
+
+	if strings.Contains(result, "<img") {
+		t.Error("img tag should be escaped")
+	}
+	if !strings.Contains(result, "&lt;img") {
+		t.Errorf("expected escaped img tag, got: %s", result)
+	}
+}
+
+func TestSanitizeMaxLength(t *testing.T) {
+	// Create a 5000 character string
+	input := strings.Repeat("a", 5000)
+	result := SanitizeText(input)
+
+	if len(result) > maxMessageLength {
+		t.Errorf("expected max %d chars, got %d", maxMessageLength, len(result))
+	}
+	if len(result) != maxMessageLength {
+		t.Errorf("expected exactly %d chars, got %d", maxMessageLength, len(result))
+	}
+}
+
+func TestSanitizePreservesNormalText(t *testing.T) {
+	input := "Hello, this is a normal message! 🔥 How are you?"
+	result := SanitizeText(input)
+
+	if result != input {
+		t.Errorf("normal text should not be modified\ngot:  %s\nwant: %s", result, input)
+	}
+}
+
+func TestSanitizeAmperstand(t *testing.T) {
+	input := "this & that < those > them"
+	result := SanitizeText(input)
+
+	expected := "this &amp; that &lt; those &gt; them"
+	if result != expected {
+		t.Errorf("HTML entities should be escaped\ngot:  %s\nwant: %s", result, expected)
+	}
+}
+
+func TestSanitizeEmptyInput(t *testing.T) {
+	result := SanitizeText("")
+	if result != "" {
+		t.Errorf("empty input should return empty string, got: %s", result)
+	}
+}
+
+// =============================================================================
+// Security Tests — E-040 CORS
+// =============================================================================
+
+func TestGetCORSOriginProduction(t *testing.T) {
+	original := os.Getenv("HEARTH_DOMAIN")
+	defer os.Setenv("HEARTH_DOMAIN", original)
+
+	os.Setenv("HEARTH_DOMAIN", "myhearth.example")
+	origin := GetCORSOrigin()
+
+	expected := "https://myhearth.example"
+	if origin != expected {
+		t.Errorf("expected %s, got %s", expected, origin)
+	}
+}
+
+func TestGetCORSOriginDevelopment(t *testing.T) {
+	original := os.Getenv("HEARTH_DOMAIN")
+	defer os.Setenv("HEARTH_DOMAIN", original)
+
+	os.Setenv("HEARTH_DOMAIN", "")
+	origin := GetCORSOrigin()
+
+	expected := "http://localhost:5173"
+	if origin != expected {
+		t.Errorf("expected %s, got %s", expected, origin)
+	}
+}
+
+func TestGetCORSOriginLocalhost(t *testing.T) {
+	original := os.Getenv("HEARTH_DOMAIN")
+	defer os.Setenv("HEARTH_DOMAIN", original)
+
+	os.Setenv("HEARTH_DOMAIN", "localhost")
+	origin := GetCORSOrigin()
+
+	expected := "http://localhost:5173"
+	if origin != expected {
+		t.Errorf("expected %s for localhost, got %s", expected, origin)
+	}
+}
+
+// =============================================================================
+// Path matching tests (used by rate limiter)
+// =============================================================================
+
+func TestMatchPrefix(t *testing.T) {
+	tests := []struct {
+		path   string
+		prefix string
+		want   bool
+	}{
+		{"/api/collections/users/auth-with-password", "/api/collections/users/auth-with-password", true},
+		{"/api/collections/users/records", "/api/collections/users/records", true},
+		{"/api/hearth/invite/validate", "/api/hearth/invite/validate", true},
+		{"/api/hearth/presence/heartbeat", "/api/hearth/presence/heartbeat", true},
+		{"/api/hearth/rooms/abc/token", "/api/hearth/invite/validate", false},
+		{"/short", "/longer-prefix", false},
+	}
+
+	for _, tt := range tests {
+		got := matchPrefix(tt.path, tt.prefix)
+		if got != tt.want {
+			t.Errorf("matchPrefix(%q, %q) = %v, want %v", tt.path, tt.prefix, got, tt.want)
+		}
+	}
+}
+
+func TestIsAuthPath(t *testing.T) {
+	if !isAuthPath("/api/collections/users/auth-with-password") {
+		t.Error("should match auth-with-password")
+	}
+	if !isAuthPath("/api/collections/users/records") {
+		t.Error("should match records (register)")
+	}
+	if isAuthPath("/api/hearth/rooms/abc/token") {
+		t.Error("should not match rooms token endpoint")
+	}
 }

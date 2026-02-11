@@ -25,7 +25,7 @@ func RegisterMessageGC(app *pocketbase.PocketBase) {
 		if affected, _ := res.RowsAffected(); affected > 0 {
 			app.Logger().Info("message GC sweep", "deleted", affected)
 			// Increment Prometheus counter (tracked in metrics.go)
-			gcDeletedTotal.Add(float64(affected))
+			gcDeletedTotal.Add(affected)
 		}
 	})
 }

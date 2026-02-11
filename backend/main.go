@@ -23,6 +23,9 @@ func main() {
 	hooks.RegisterInvite(app)
 	hooks.RegisterPoW(app)
 	hooks.RegisterLiveKitToken(app)
+	hooks.RegisterRateLimit(app)
+	hooks.RegisterSanitize(app)
+	hooks.RegisterCORS(app)
 
 	// Phase 3: Observability
 	hooks.RegisterMetrics(app)

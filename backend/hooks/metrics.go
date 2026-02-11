@@ -74,7 +74,7 @@ func writeCounter(b *strings.Builder, name, help string, value float64) {
 }
 
 // countRecords returns the count of records in a collection, or 0 on error.
-func countRecords(app core.App, collection string) int {
+func countRecords(app core.App, collection string) int64 {
 	total, err := app.CountRecords(collection)
 	if err != nil {
 		return 0

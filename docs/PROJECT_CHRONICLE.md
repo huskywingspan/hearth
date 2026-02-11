@@ -16,17 +16,19 @@
 | **Technical Research** | ✅ Complete | PocketBase/SQLite, LiveKit, Extism/Wasm, security |
 | **UX Research** | ✅ Complete | Spatial audio, ephemeral messaging, cozy UI, onboarding |
 | **Release Roadmap** | ✅ Complete | 6 releases (v0.1 Ember → v2.0 Open Flame) with task IDs |
-| **Research Backlog** | ✅ Complete | 8 research tasks: R-001 through R-006 ✅ complete, R-007/R-008 remaining (medium priority). 8 open questions. |
+| **Research Backlog** | ✅ Complete | 8 research tasks: R-001 through R-006 + R-008 ✅ complete. R-007 remaining (medium priority, blocks sound only). 7 open questions. |
 | **Agent Roles** | ✅ Complete | Builder, Researcher, Reviewer — specialized for Hearth |
-| **Backend (PocketBase)** | 🟡 Unblocked | R-001 (Go API) + R-004 (JS SDK) complete — backend fully unblocked |
-| **Frontend (React/Vite)** | 🟡 Unblocked | R-004 (PocketBase JS) + R-005 (LiveKit React) + R-006 (spatial audio) complete — frontend SDK research done |
-| **Voice (LiveKit)** | 🟡 Unblocked | R-005 (React SDK) + R-006 (Web Audio spatial) complete — voice architecture ready |
-| **Docker Deployment** | 🟡 Unblocked | R-002 (Caddy L4) + R-003 (ADR-001 accepted) — deployment fully defined |
+| **Backend (PocketBase)** | ✅ Complete | v0.1 Ember shipped. Auth, CRUD, GC, presence, HMAC, PoW, LiveKit JWT. 36/36 tests. |
+| **Frontend (React/Vite)** | ✅ Complete | v0.2 Kindling shipped. 27 files, 91KB gzipped, Subtle Warmth design system, Campfire chat. |
+| **Voice (LiveKit)** | 🟡 Unblocked | R-005 (React SDK) + R-006 (Web Audio spatial) complete — ready for v0.3 |
+| **Docker Deployment** | ✅ Complete | PocketBase serves SPA via `pb_public/`. Standalone `Dockerfile.frontend` also available. |
 | **Plugin System (Extism)** | 🔲 Not Started | Scheduled for v2.0 |
 
 ### Current Milestone
-- **v0.0 — Research & Foundation** (Feb 2026) — IN PROGRESS
-- Next: **v0.1 Ember** (Backend skeleton + chat API) — Target: Apr 2026
+- **v0.1 — Ember** (Backend skeleton + chat API) — COMPLETE ✅
+- **v0.2 — Kindling** (Frontend + Campfire chat) — COMPLETE ✅
+- Next: **v0.3 Hearth Fire** (Voice — The Portal) — Target: Aug 2026
+- Marketing prep: Post #1 (r/selfhosted concept pitch) targeted for end of v0.2 polish
 
 ---
 
@@ -80,6 +82,11 @@
 | 2026-02-10 | **R-005 Complete** | LiveKit React SDK guide. Two API surfaces: `LiveKitRoom` (stable) and `SessionProvider` (beta). **Key discovery:** `RemoteAudioTrack.setWebAudioPlugins()` — experimental API to inject Web Audio nodes into LiveKit's audio pipeline. Custom `PortalAudioRenderer` pattern (must NOT use `RoomAudioRenderer` for Portal). |
 | 2026-02-10 | **R-006 Complete** | Web Audio spatial audio for 2D canvas. `PannerNode` with `linear` distanceModel (only model that reaches true silence). `equalpower` panning, Z=0 for 2D. Complete `useSpatialAudio` hook. ~2% CPU at 20 participants. Ember glow via `AnalyserNode`. |
 | 2026-02-11 | **Sprint 1 Spec** | `docs/specs/sprint-1-ember.md` — 4 phases, 20 subtasks for Builder. Covers scaffolding, data layer (collections, GC, presence), auth & security (HMAC, PoW, LiveKit JWT), observability (metrics, logging), and testing. |
+| 2026-02-11 | **Builder Implementation Review** | All Sprint 1 backend code reviewed and verified. **Critical fix:** `go.mod` PocketBase version corrected from v0.26.6 → v0.36.2 (was preventing compilation). LiveKit protocol updated v1.24.0 → v1.44.0, dbx v1.11.0 → v1.12.0. Two type mismatch bugs fixed (`gcDeletedTotal.Add` needed `int64` not `float64`; `countRecords` return type `int` → `int64`). Go 1.24.0 minimum enforced by `go mod tidy`. **Result:** `go build` ✅ clean, 36/36 tests passing ✅. |
+| 2026-02-11 | **R-008 Complete** | CSS animation performance for Campfire fading at scale. Compositor-thread GPU animation safe at 200+ concurrent fades. `content-visibility: auto` (Baseline 2024) for browser-native virtualization. No JS virtualization needed. TanStack Virtual deferred as fallback. `will-change` rejected. Performance budget defined: <300 DOM messages, <50 animating, <30 GPU layers. |
+| 2026-02-11 | **Sprint 2 Spec** | `docs/specs/sprint-2-kindling.md` — 5 phases covering frontend scaffolding (Vite+React+TS+Tailwind), auth & SSE reconnect (SEC-005/SEC-006), Campfire chat (CSS decay engine, real-time messages, mumbling indicator, presence), mobile responsive layout, and Docker frontend build. ~13 days estimated. |
+| 2026-02-11 | **R-009 Initiated + Marketing Draft** | Pre-alpha marketing strategy formalized. Reddit post structure drafted (`docs/specs/marketing-reddit-draft.md`). Two-post plan: concept pitch at end of v0.2, "try it" post at v1.0. Target communities: r/selfhosted (primary), r/privacy, r/opensource, HN (deferred). Competitive response playbook for Matrix/Revolt/Mumble. Marketing phase (M-001–M-006) added to roadmap. |
+| 2026-02-11 | **Sprint 2 Implementation Complete (v0.2 Kindling)** | Builder delivered 27 files. Frontend shell: Vite + React 19 + TypeScript strict + Tailwind v4. Subtle Warmth design system fully implemented (dark + light mode, @fontsource fonts, pillow buttons, candlelight shadows). Campfire chat: SSE real-time subscription, 4-stage CSS fade (`campfire.css`), negative `animation-delay` for mid-fade page loads, `animationend` DOM cleanup, optimistic send with revert, time sync via Date header RTT/2, mumbling indicator (CSS bars), heartbeat presence (30s). Auth: `AuthProvider` context, token auto-refresh, `useReconnect` with `PB_CONNECT` resync (SEC-006 ✅). Code-splitting via `React.lazy` (K-024). PocketBase serves SPA from `pb_public/`. **Build:** `tsc --noEmit` clean, Vite 1.76s, ~91KB gzipped (under 150KB budget). **Deferred:** SEC-005 httpOnly cookies (PB SDK limitation), typing broadcast (needs backend topic), mobile drawer, error toasts, sound/foley (R-007). |
 
 ---
 
@@ -285,11 +292,46 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 
 ## Bug Registry
 
-> No bugs yet — project is in research phase. This section will grow once implementation begins.
-
 | ID | Severity | Component | Title | Status | Date Found | Date Fixed |
 |----|----------|-----------|-------|--------|-----------|-----------|
-| — | — | — | — | — | — | — |
+| BUG-001 | LOW | `message_gc.go` | `gcDeletedTotal.Add()` called with `float64` but `atomic.Int64.Add` requires `int64` | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-002 | LOW | `metrics.go` | `countRecords()` returned `int` but `app.CountRecords()` returns `int64` — type mismatch | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-003 | CRITICAL | `go.mod` | PocketBase version declared as v0.26.6 (nonexistent version matching code's API) — should be v0.36.2. Code used v0.36+ patterns (OnServe, OnBootstrap, core.NewBaseCollection). Prevented compilation. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+
+---
+
+## Builder Implementation Decisions (Sprint 1)
+
+> These are design decisions Builder made during Sprint 1 implementation that are not captured in the original spec. Documented here for institutional knowledge.
+
+| Decision | Rationale | Verified |
+|----------|-----------|----------|
+| `RelationField.CollectionId` uses collection name strings (e.g., `"users"`, `"rooms"`) instead of runtime IDs | PocketBase resolves name → ID at save time, avoiding bootstrap ordering issues | ✅ Confirmed via PB v0.36.2 API docs |
+| `expires_at` enforced server-side in `OnRecordCreate("messages")` hook — clients cannot set their own TTL | Prevents abuse: server reads room's `default_ttl` and computes expiry. Defense-in-depth. | ✅ Auth.go line 50-67 |
+| Room creation auto-adds creator as `room_members` with role `"owner"` via `OnRecordAfterCreateSuccess("rooms")` | Ensures every room has at least one owner. Race-free: runs after DB commit. | ✅ Auth.go line 73-89 |
+| PoW challenges consumed on verify (one-time use) with 5-min expiry | Prevents challenge reuse attacks. Challenge deleted from map before validation. | ✅ Pow.go line 88-93 |
+| Metrics endpoint (`/metrics`) is unauthenticated | Prometheus convention — metrics scraper shouldn't need app auth. Endpoint exposed on internal network only (Docker host networking). | ✅ Accepted — SEC convention |
+| `gcDeletedTotal` uses `atomic.Int64` for lock-free increments | Counter updated from cron goroutine, read from HTTP handler. `sync/atomic` avoids mutex contention. | ✅ Thread-safe by design |
+| CORS middleware sets headers manually instead of using PocketBase's built-in CORS | Needed explicit origin validation and preflighting control — PB's built-in CORS is too permissive for production. | ✅ Cors.go |
+| Rate limiter uses sliding-window token bucket (in-memory) with 5-min sweep cron | No Redis needed. `sync.Mutex`-protected map. Memory bounded by sweep. 5 profiles: auth, invite, message, heartbeat, general. | ✅ 6 tests pass |
+| Input sanitization uses `html.EscapeString` (Go stdlib) — no external dependency | Lightweight, covers all HTML entity escaping. Applied to: message body, display_name, room name/description. Max 4000 chars. | ✅ 6 tests pass |
+
+## Builder Implementation Decisions (Sprint 2)
+
+> Design decisions Builder made during Sprint 2 (v0.2 Kindling) implementation.
+
+| Decision | Rationale | Verified |
+|----------|-----------|----------|
+| PocketBase serves SPA via `pb_public/` — frontend dist baked into PB Docker image | Avoids separate static file server. PB natively serves static files. Caddy still handles TLS. Standalone `Dockerfile.frontend` also provided as alternate. | ✅ Vite build output confirmed |
+| SEC-005 httpOnly cookies deferred — using `localStorage` auth store | PB JS SDK doesn't natively support httpOnly cookie auth; would need custom backend proxy hooks. `localStorage` mitigated by CSP `script-src 'self'` (SEC-003). Documented as accepted risk. | ✅ Intentional deferral |
+| React Router over TanStack Router | Spec said either works. React Router is simpler, more widely documented, smaller API surface for a 3-page app. | ✅ Standard choice |
+| No `will-change: opacity` on `.campfire-message` | Per R-008: browser auto-promotes elements with active CSS animations. Explicit `will-change` wastes GPU memory by creating permanent layers. | ✅ R-008 validated |
+| `@fontsource/inter` + `@fontsource/merriweather` (npm, self-hosted) | Privacy-first: no Google Fonts CDN requests. Fonts bundled in build output. | ✅ No external requests |
+| Tailwind v4 `@theme` directive for design tokens (not `tailwind.config.js`) | Tailwind v4 moved to CSS-native config. `@theme` in `globals.css` replaces `theme.extend` in config file. | ✅ Tailwind v4 pattern |
+| Single `campfire-fade` keyframe with negative `animation-delay` | Per R-008: one animation handles all 4 decay stages (Fresh→Fading→Echo→Gone). Negative delay starts mid-fade for messages already in progress on page load. | ✅ R-008 validated |
+| `content-visibility: auto` + `contain-intrinsic-size: auto 80px` on messages | Per R-008: browser-native virtualization. Offscreen messages skip rendering entirely. Zero JS overhead. | ✅ R-008 validated |
+| Optimistic messages marked with `data-optimistic="true"` and `animation: none` | Prevents optimistic messages from fading before server confirms. Server-assigned `expires_at` triggers real fade after confirmation. | ✅ Spec pattern |
+| `useReconnect` fires `authRefresh()` before data resync on `PB_CONNECT` | Per R-004: reconnect events don't replay missed SSE messages. Auth must be re-validated first (SEC-006), then full state re-fetched. | ✅ SEC-006 resolved |
 
 ---
 ## 🛡️ Security Concerns Tracker
@@ -311,8 +353,8 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 
 | ID | Concern | Severity | Target Sprint | Rationale for Deferral | Blocked By |
 |----|---------|----------|---------------|----------------------|------------|
-| SEC-005 | **Auth Token Storage** — PocketBase default stores JWT in `localStorage`, which is readable by any JavaScript on the page (including XSS). `httpOnly` cookies are more secure. | MEDIUM | v0.2 (Kindling) | Requires custom `AuthStore` implementation in the frontend JS SDK. No frontend exists yet in Sprint 1. | Frontend scaffold (K-003) |
-| SEC-006 | **SSE Reconnect Auth Race** — When PocketBase's SSE connection drops and auto-reconnects, the auth token may have expired, causing silent unauthenticated state. | MEDIUM | v0.2 (Kindling) | This is a client-side concern. The `PB_CONNECT` handler in R-004 addresses it, but it needs implementation in the React hooks. | Frontend realtime hooks (K-011) |
+| SEC-005 | **Auth Token Storage** — PocketBase default stores JWT in `localStorage`, which is readable by any JavaScript on the page (including XSS). `httpOnly` cookies are more secure. | MEDIUM | ~~v0.2~~ v1.0 | PB JS SDK doesn't support httpOnly cookies natively. Requires backend auth proxy hooks. Mitigated by CSP `script-src 'self'` (SEC-003). | Backend proxy hooks |
+| SEC-006 | **SSE Reconnect Auth Race** — When PocketBase's SSE connection drops and auto-reconnects, the auth token may have expired, causing silent unauthenticated state. | MEDIUM | ✅ v0.2 Done | Resolved: `useReconnect` calls `authRefresh()` on every `PB_CONNECT` after initial connect. Auth failure clears store. | — |
 | SEC-007 | **Secret Management in Docker** — `.env` files with HMAC secrets and API keys are readable by any process. Production should use Docker secrets or mounted files with restricted permissions. | LOW → HIGH | v1.0 (First Light) | Acceptable for development. Must be hardened before any real users. | Deployment hardening (F-010) |
 | SEC-008 | **Dependency Supply Chain** — Go modules pulled from the internet could be compromised. Need vulnerability scanning and version pinning. | LOW → MEDIUM | v1.0 (First Light) | Go's `go.sum` provides cryptographic verification. `govulncheck` should be added to CI before release. | CI pipeline |
 | SEC-009 | **LiveKit Room Name Guessability** — If room names in LiveKit are predictable (sequential IDs), token generation could be targeted. Room names should be UUIDs or random slugs. | HIGH | Sprint 1 (verify) | Already spec'd in E-024 — token endpoint verifies room membership. Flagged here as a reminder to verify the membership check is airtight during code review. | E-024 implementation |
@@ -362,6 +404,28 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 **What's Actually Current:** PocketBase v0.23+ uses `app.OnServe()` and `app.DB()` directly. The entire hook and data access API has shifted.
 
 **Lesson Learned:** Always verify API versions against official documentation before writing code. AI models (including Gemini) can have stale training data. Flagged as R-001 in the research backlog — this MUST be resolved before any Go code is written.
+
+---
+
+### PIVOT-003: go.mod Version Discrepancy (Builder Review)
+
+**Date:** February 11, 2026
+
+**Context:** Builder agent wrote all Sprint 1 Go code using correct v0.36+ API patterns (from R-001 research) but declared `github.com/pocketbase/pocketbase v0.26.6` in go.mod — a nonexistent version that caused compilation failure. LiveKit protocol was also stale (v1.24.0 → v1.44.0).
+
+**Root Cause:** Builder didn't have Go installed at build time, so `go mod tidy` never ran. The version number was likely hallucinated by the LLM.
+
+**Resolution:** Researcher (Vesta) corrected go.mod to v0.36.2, ran `go mod tidy` (which also upgraded Go directive from 1.23.0 → 1.24.0), and fixed two type mismatch bugs revealed by compilation.
+
+**Lesson Learned:** **Always run `go mod tidy` and `go build` immediately after writing Go code.** An LLM writing module dependencies without compiler verification will produce plausible-but-wrong version numbers. Builder should be instructed to verify compilability or flag it as a known issue for Researcher.
+
+---
+
+### Testing Note: Race Detector
+
+**Date:** February 11, 2026
+
+`go test -race` requires CGo (a C compiler) which is not installed on the development machine. Tests run without `-race` for now. **Action for CI:** Docker build uses Alpine with Go — `go test -race` should work in the containerized build. For local development, install `mingw-w64` or use WSL for race-detected testing.
 
 ---
 

@@ -1,7 +1,7 @@
 # Hearth — Release Roadmap & Task Breakdown
 
 > **Last Updated:** 2026-02-11
-> **Phase:** Research & Exploration → Sprint 1 ready
+> **Phase:** Sprint 2 complete → Marketing prep + Sprint 3 ready
 
 ---
 
@@ -69,33 +69,35 @@
 
 **Goal:** A working React frontend that connects to the PocketBase backend. Campfire (fading chat) is the first user-facing feature. Design system implemented.
 
+> **Sprint Spec:** [`docs/specs/sprint-2-kindling.md`](specs/sprint-2-kindling.md) — Detailed phases, subtasks, code patterns, and acceptance criteria for Builder.
+
 ### Phase 0.2.A — Frontend Scaffolding
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| K-001 | Research: Vite + React + TailwindCSS project config (TS strict) | Research | Not Started | |
+| K-001 | Research: Vite + React + TailwindCSS project config (TS strict) | Research | ✅ Done | Standard tooling — covered in Sprint 2 spec |
 | K-002 | Research: PocketBase JS SDK — real-time subscriptions, auth | Research | ✅ Done | R-004 complete. See [`R-004`](research/R-004-pocketbase-js-sdk.md) |
-| K-003 | Scaffold `frontend/` (Vite, React, TailwindCSS, TypeScript strict) | Build | Not Started | |
-| K-004 | Implement design tokens: Subtle Warmth palette, typography, spacing | Build | Not Started | Tailwind config + CSS custom properties |
-| K-005 | Component library: Button (pillow), Card, Input, Avatar | Build | Not Started | Rounded, soft shadows, squash & stretch |
-| K-006 | Motion primitives: ease-in-out transitions, float-in animation | Build | Not Started | No linear transitions |
+| K-003 | Scaffold `frontend/` (Vite, React, TailwindCSS, TypeScript strict) | Build | ✅ Done | 27 files, `tsc --noEmit` clean, 91KB gzipped |
+| K-004 | Implement design tokens: Subtle Warmth palette, typography, spacing | Build | ✅ Done | `globals.css` @theme tokens, light mode, self-hosted fonts |
+| K-005 | Component library: Button (pillow), Card, Input, Avatar | Build | ✅ Done | + Spinner. Rounded, warm shadows, squash & stretch |
+| K-006 | Motion primitives: ease-in-out transitions, float-in animation | Build | ✅ Done | float-in, squash, warm-pulse, slide-in-right |
 
 ### Phase 0.2.B — Campfire (Fading Chat)
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| K-010 | PocketBase SDK client setup + auth integration | Build | Not Started | |
-| K-011 | Chat message list with real-time subscription | Build | Not Started | WebSocket via PB real-time API |
-| K-012 | CSS transparency decay engine (4-stage: Fresh→Fading→Echo→Gone) | Build | Not Started | `animation-delay` with negative offset |
-| K-013 | Time sync with server via `Date` header | Build | Not Started | |
-| K-014 | Optimistic message sending with revert-on-error | Build | Not Started | |
-| K-015 | "Mumbling" typing indicator | Build | Not Started | Blurred waveform, not "User is typing..." |
-| K-016 | Exponential backoff WebSocket reconnection | Build | Not Started | |
-| K-017 | Heartbeat-based presence display (30s interval) | Build | Not Started | |
+| K-010 | PocketBase SDK client setup + auth integration | Build | ✅ Done | Singleton client, AuthProvider, token auto-refresh |
+| K-011 | Chat message list with real-time subscription | Build | ✅ Done | SSE subscription with create/update/delete handlers |
+| K-012 | CSS transparency decay engine (4-stage: Fresh→Fading→Echo→Gone) | Build | ✅ Done | `campfire.css` — `animation-delay` with negative offset. R-008 compositor-thread. See [`R-008`](research/R-008-css-animation-performance.md) |
+| K-013 | Time sync with server via `Date` header | Build | ✅ Done | RTT/2 offset estimation, 5-min resync |
+| K-014 | Optimistic message sending with revert-on-error | Build | ✅ Done | Temp ID → server ID swap, revert on catch |
+| K-015 | "Mumbling" typing indicator | Build | ✅ Done | Blurred undulating bars via CSS. Broadcast not yet wired (needs backend topic) |
+| K-016 | Exponential backoff WebSocket reconnection | Build | ✅ Done | PB SDK built-in backoff + `useReconnect` resync |
+| K-017 | Heartbeat-based presence display (30s interval) | Build | ✅ Done | `usePresence` — POST heartbeat + GET poll |
 
 ### Phase 0.2.S — Security Hardening (Frontend)
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| SEC-005 | 🛡️ Migrate auth tokens from `localStorage` to `httpOnly` cookies | Security | Not Started | Custom `AuthStore` for PocketBase JS SDK. Prevents XSS token theft. |
-| SEC-006 | 🛡️ SSE reconnect auth validation | Security | Not Started | On `PB_CONNECT`, verify token validity and refresh. Prevent silent auth degradation. |
+| SEC-005 | 🛡️ Migrate auth tokens from `localStorage` to `httpOnly` cookies | Security | ⏸️ Deferred | PB SDK doesn't natively support; needs backend auth proxy. localStorage used, mitigated by CSP. |
+| SEC-006 | 🛡️ SSE reconnect auth validation | Security | ✅ Done | `useReconnect` — `authRefresh()` on every `PB_CONNECT` after first connect |
 
 ### Phase 0.2.C — Sound & Polish
 | ID | Task | Type | Status | Notes |
@@ -103,8 +105,18 @@
 | K-020 | Research: Royalty-free organic foley sounds (wooden clicks, cork pop) | Research | Not Started | |
 | K-021 | Sound system: interaction sounds, join/leave, ambient | Build | Not Started | Web Audio API |
 | K-022 | Generative ambient engine (fire crackle, rain) — prototype | Build | Not Started | Dynamic ducking on speech |
-| K-023 | Mobile-first responsive layout | Build | Not Started | |
-| K-024 | Code-splitting via `React.lazy` | Build | Not Started | |
+| K-023 | Mobile-first responsive layout | Build | 🟡 Partial | Shell + responsive breakpoints. Mobile drawer not yet implemented. |
+| K-024 | Code-splitting via `React.lazy` | Build | ✅ Done | LoginPage, HomePage, RoomPage lazy-loaded |
+
+### Phase 0.2.M — Marketing Prep (Pre-Alpha Reveal)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| M-001 | Research: Competitive positioning (Revolt, Element, Mumble, Signal) | Research | Not Started | R-009. "Why not X?" FAQ |
+| M-002 | Draft Reddit post for r/selfhosted (concept + screenshots) | Docs | In Progress | Post structure drafted. See [`marketing-reddit-draft.md`](specs/marketing-reddit-draft.md) |
+| M-003 | Record 2-3 min screen capture (Campfire fading, UI, design system) | Docs | Not Started | GIF for Reddit, video for cross-posting |
+| M-004 | README polish — screenshot, philosophy, tech stack, one-liner deploy | Docs | Not Started | GitHub repo is the "storefront" |
+| M-005 | License decision (AGPL-3.0 vs. MIT vs. BSL) | Research | Not Started | r/selfhosted will ask immediately |
+| M-006 | Second Reddit post plan (r/privacy, r/opensource, HN) | Docs | Not Started | After initial r/selfhosted feedback |
 
 ---
 

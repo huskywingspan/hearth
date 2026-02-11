@@ -47,6 +47,7 @@ apps:
 
           # Route 3: PocketBase API + SPA
           # TLS terminated at Caddy → plaintext HTTP to PocketBase
+          # Security headers injected at this layer (E-041)
           - match:
               - tls:
                   sni:
@@ -57,6 +58,29 @@ apps:
                 upstreams:
                   - dial:
                       - "localhost:8090"
+                # Security headers — XSS prevention, clickjacking, MIME sniffing
+                headers:
+                  response:
+                    set:
+                      Content-Security-Policy:
+                        - >-
+                          default-src 'self';
+                          script-src 'self';
+                          style-src 'self' 'unsafe-inline';
+                          connect-src 'self' wss://lk.{env.HEARTH_DOMAIN};
+                          media-src 'self' blob:;
+                          img-src 'self' data: blob:;
+                          frame-ancestors 'none';
+                          base-uri 'self';
+                          form-action 'self'
+                      X-Content-Type-Options:
+                        - "nosniff"
+                      X-Frame-Options:
+                        - "DENY"
+                      Referrer-Policy:
+                        - "strict-origin-when-cross-origin"
+                      Permissions-Policy:
+                        - "microphone=(self), camera=(), geolocation=()"
 
   # === HTTP: ACME Challenge + HTTPS Redirect ===
   http:

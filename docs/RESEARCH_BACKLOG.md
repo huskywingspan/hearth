@@ -1,6 +1,6 @@
 # Hearth — Research Backlog & Open Questions
 
-> **Last Updated:** 2026-02-10 (R-003 through R-006 completed)
+> **Last Updated:** 2026-02-11 (R-008 completed)
 > **Owner:** Researcher Agent
 
 ---
@@ -49,10 +49,17 @@
 **Context:** Need both one-shot interaction sounds and loopable ambient textures. Must be royalty-free / CC0. Candidates: Freesound.org, Sonniss GDC bundles, Zapsplat.
 **Deliverable:** Curated asset list with license verification.
 
-### R-008: CSS Animation Performance — Fading at Scale
+### R-008: CSS Animation Performance — Fading at Scale ✅ COMPLETE
 **Priority:** Medium | **Blocks:** K-012
-**Question:** What are the browser limits for concurrent CSS animations? If 200 messages are visible and all fading simultaneously, does compositor-thread rendering hold up?
-**Deliverable:** Benchmark results + recommendation (batch animations, virtualize old messages, or trust the compositor).
+**Status:** Complete — 2026-02-11 | **Report:** [`docs/research/R-008-css-animation-performance.md`](research/R-008-css-animation-performance.md)
+**Outcome:** CSS `opacity` animations run on the compositor thread (GPU-accelerated), safely handling 200+ concurrent fades at 60 FPS on desktop. Real constraint is GPU memory from layer promotion (~128KB per 400×80 message), not CPU. `content-visibility: auto` (Baseline 2024, all major browsers) provides browser-native virtualization with zero JS overhead. `animationend` event for DOM cleanup keeps active message count bounded. **No JS virtualization library needed.** TanStack Virtual deferred as documented fallback. `will-change` explicitly rejected (browser auto-promotes). **Campfire CSS decay engine is unblocked.**
+
+### R-009: Pre-Alpha Marketing Prep — Reddit Post & Community Strategy
+**Priority:** Medium | **Blocks:** M-001 through M-006
+**Question:** What's the optimal framing, post structure, subreddit targeting, and visual assets needed for Hearth's first public reveal? How do competing projects (Revolt, Element, Mumble) position themselves, and how do we differentiate?
+**Deliverable:** Reddit post draft, "Why not X?" FAQ, competitive positioning guide, README polish spec, visual asset checklist.
+**Timing:** Begin research when v0.2 (Kindling) frontend is screenshottable. Post targets end of v0.2.
+**Status:** Post structure drafted. See [`docs/specs/marketing-reddit-draft.md`](specs/marketing-reddit-draft.md). Full research (competitive analysis, FAQ, README) scheduled for v0.2 completion.
 
 ---
 
@@ -126,3 +133,4 @@
 | R-004 | PocketBase JS SDK Real-time | 2026-02-10 | SSE-based realtime, auto-reconnect, PB_CONNECT resync. React hooks for subscriptions, auth, optimistic updates. |
 | R-005 | LiveKit React SDK Lifecycle | 2026-02-10 | Two API surfaces (LiveKitRoom stable, SessionProvider beta). `RemoteAudioTrack.setWebAudioPlugins()` for spatial audio. Custom PortalAudioRenderer pattern. |
 | R-006 | Web Audio Spatial Audio (2D) | 2026-02-10 | PannerNode linear distance model, equalpower panning, Z=0 for 2D. Complete `useSpatialAudio` hook. ~2% CPU at 20 participants. |
+| R-008 | CSS Animation Performance (Fading) | 2026-02-11 | Compositor-thread GPU animation safe at 200+ concurrent. `content-visibility: auto` for browser-native virtualization. No JS libs needed. TanStack Virtual deferred as fallback. |

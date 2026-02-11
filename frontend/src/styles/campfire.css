@@ -1,0 +1,51 @@
+/* === Campfire: 4-Stage Transparency Decay Engine (K-012) ===
+ *
+ * Architecture (from R-008):
+ * - ONE CSS animation per message, set once at render time
+ * - Only animates `opacity` (compositor-thread, GPU-accelerated)
+ * - content-visibility: auto for browser-native offscreen virtualization
+ * - animationend fires → remove from React state → DOM cleanup
+ * - Negative animation-delay starts mid-fade for old messages on page load
+ * - NO will-change (browser auto-promotes animated elements)
+ * - NO JS animation loops (requestAnimationFrame, setInterval)
+ */
+
+@keyframes campfire-fade {
+  0%   { opacity: 1; }     /* Fresh — active conversation */
+  40%  { opacity: 0.5; }   /* Fading — past context */
+  80%  { opacity: 0.1; }   /* Echo — visual texture */
+  100% { opacity: 0; }     /* Gone — vanished */
+}
+
+.campfire-message {
+  /* Browser-native virtualization (R-008 Strategy 2) */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+
+  /* Single CSS animation — compositor-thread only */
+  animation: campfire-fade var(--fade-duration) ease-out forwards;
+  animation-delay: var(--age-offset);
+
+  /* Float-in entrance */
+  transform-origin: center;
+}
+
+/* Optimistic messages: don't fade until server confirms */
+.campfire-message[data-optimistic="true"] {
+  animation: none;
+  opacity: 0.85;
+}
+
+/* Mumbling (typing) indicator */
+.mumble-bar {
+  width: 3px;
+  height: 12px;
+  background-color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  animation: mumble 1.2s var(--ease-default) infinite;
+}
+
+@keyframes mumble {
+  0%, 100% { transform: scaleY(0.4); opacity: 0.3; }
+  50%      { transform: scaleY(1);   opacity: 0.7; }
+}

@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+/* === Fonts (self-hosted, privacy-first — no external requests) === */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/merriweather/400.css";
+@import "@fontsource/merriweather/700.css";
+
+/* === Subtle Warmth Design Tokens (Tailwind v4 @theme) === */
+
+@theme {
+  /* Color Palette — Dark Mode (default: Hearth is a firelit room) */
+  --color-bg-primary: #2B211E;
+  --color-bg-secondary: #3E2C29;
+  --color-bg-elevated: #4A3632;
+  --color-bg-input: #352723;
+
+  --color-text-primary: #F2E2D9;
+  --color-text-secondary: #B8A69A;
+  --color-text-muted: #7A6B62;
+
+  --color-accent-amber: #E6A44F;
+  --color-accent-amber-hover: #D4933E;
+  --color-accent-gold: #F0C674;
+  --color-alert-clay: #C45C3A;
+  --color-alert-clay-hover: #A8492E;
+  --color-accent-sage: #7A9A7E;
+  --color-accent-terracotta: #C47A5A;
+  --color-accent-slate: #6B8A9A;
+
+  /* Typography */
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Merriweather', Georgia, serif;
+
+  /* Shape (rounded, cozy, pillow-like) */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-pill: 9999px;
+
+  /* Shadows (candlelight — warm, diffused) */
+  --shadow-sm: 0 1px 3px rgba(43, 33, 30, 0.3);
+  --shadow-md: 0 4px 12px rgba(43, 33, 30, 0.4);
+  --shadow-lg: 0 8px 24px rgba(43, 33, 30, 0.5);
+  --shadow-glow: 0 0 20px rgba(230, 164, 79, 0.3);
+
+  /* Spacing */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  /* Transitions (never linear — always ease-in-out) */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+}
+
+/* Light mode (OS preference) */
+@media (prefers-color-scheme: light) {
+  @theme {
+    --color-bg-primary: #FAF0E1;
+    --color-bg-secondary: #F2E2D9;
+    --color-bg-elevated: #FFFFFF;
+    --color-bg-input: #F5EDE7;
+    --color-text-primary: #2B211E;
+    --color-text-secondary: #5A4A42;
+    --color-text-muted: #8A7A72;
+  }
+}
+
+/* === Base Styles === */
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* === Motion Primitives (K-006) ===
+   Rules:
+   - No `linear` timing — always ease-in-out or custom bezier
+   - Only animate `opacity` and `transform` (compositor-thread, R-008)
+   - CSS animations, not JS requestAnimationFrame
+*/
+
+/* Float in — messages and cards enter like a leaf falling */
+@keyframes float-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-float-in {
+  animation: float-in var(--duration-normal) var(--ease-default) both;
+}
+
+/* Squash & stretch for interactive elements */
+@keyframes squash {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95, 1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Warm pulse for loading / active states */
+@keyframes warm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-warm-pulse {
+  animation: warm-pulse 2s var(--ease-default) infinite;
+}
+
+/* Slide in from right — page transitions */
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in-right var(--duration-slow) var(--ease-default) both;
+}
