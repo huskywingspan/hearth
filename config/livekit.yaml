@@ -1,0 +1,54 @@
+# livekit.yaml — Hearth voice/video server
+# Single-node, no Redis, optimized for 1 vCPU / 400MB heap
+
+port: 7880
+
+# === RTC (WebRTC) ===
+rtc:
+  port_range_start: 50000
+  port_range_end: 60000
+  use_ice_lite: true
+  tcp_fallback_port: 7881
+  # use_external_ip: true  # Uncomment if server has multiple interfaces
+
+# === Keys ===
+# API key → secret mapping. Secret loaded from env at deploy time.
+keys:
+  hearth-api-key: ${LIVEKIT_API_SECRET}
+
+# === Room Defaults ===
+room:
+  auto_create: false      # Rooms created explicitly by PocketBase — prevents unauthorized creation
+  empty_timeout: 300      # 5 min — close room if empty
+  max_participants: 20    # Hearth is intimate, not massive
+
+# === Audio (Hearth is voice-first) ===
+audio:
+  active_sensitivity: 30   # dBFS threshold for "speaking"
+  min_percentile: 15
+
+# === Video ===
+# No transcoding — saves massive CPU on 1 vCPU
+# Video only enabled when room.allow_video is true
+
+# === TURN ===
+turn:
+  enabled: true
+  domain: turn.${HEARTH_DOMAIN}
+  tls_port: 5349
+  udp_port: 3478
+  # Cert files managed by Caddy — shared via Docker volume
+  cert_file: /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/turn.${HEARTH_DOMAIN}/turn.${HEARTH_DOMAIN}.crt
+  key_file: /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/turn.${HEARTH_DOMAIN}/turn.${HEARTH_DOMAIN}.key
+
+# === Logging ===
+logging:
+  level: info
+  pion_level: warn
+
+# === Limits (1GB constraint) ===
+limit:
+  num_tracks: 50           # Max simultaneous audio tracks
+  bytes_per_sec: 500000    # 500 KB/s per participant
+
+# Redis deliberately omitted — single-node mode saves ~25MB RAM

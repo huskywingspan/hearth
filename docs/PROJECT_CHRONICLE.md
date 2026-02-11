@@ -292,7 +292,39 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 | — | — | — | — | — | — | — |
 
 ---
+## 🛡️ Security Concerns Tracker
 
+> **Purpose:** Dedicated tracking for security items to ensure nothing is forgotten. These are flagged with elevated visibility because security is foundational to Hearth's privacy-first promise.
+>
+> **Rule:** No security concern leaves this table without being either **resolved** (with a task ID and date) or **explicitly accepted as a known risk** with documented rationale.
+
+### Resolved in Sprint 1 (v0.1)
+
+| ID | Concern | Severity | Resolution | Task ID | Date |
+|----|---------|----------|-----------|---------|------|
+| SEC-001 | **Rate Limiting** — No protection against request flooding on authenticated endpoints. A single user or script could exhaust the 1 vCPU server. | HIGH | Per-IP + per-user sliding-window rate limiter in Go. Auth: 5/15min, API: 60/min, Messages: 30/min per user. | E-042 | Sprint 1 |
+| SEC-002 | **CORS Policy** — Without CORS, any website could hijack a logged-in user's session to make API requests (cross-site request forgery). | HIGH | PocketBase `AllowedOrigins` locked to `https://{HEARTH_DOMAIN}`. No wildcard. | E-040 | Sprint 1 |
+| SEC-003 | **CSP Headers** — Missing Content Security Policy allows potential XSS if input sanitization is bypassed. | MEDIUM | Full CSP header via Caddy: `script-src 'self'`, `frame-ancestors 'none'`, plus security headers (X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy). | E-041 | Sprint 1 |
+| SEC-004 | **Input Sanitization** — User-generated chat content rendered in other browsers without server-side sanitization. | HIGH | `html.EscapeString()` on all user text (messages, display names, room names) before DB save. 4000-char limit. | E-043 | Sprint 1 |
+
+### Deferred — Requires Action Before Production
+
+| ID | Concern | Severity | Target Sprint | Rationale for Deferral | Blocked By |
+|----|---------|----------|---------------|----------------------|------------|
+| SEC-005 | **Auth Token Storage** — PocketBase default stores JWT in `localStorage`, which is readable by any JavaScript on the page (including XSS). `httpOnly` cookies are more secure. | MEDIUM | v0.2 (Kindling) | Requires custom `AuthStore` implementation in the frontend JS SDK. No frontend exists yet in Sprint 1. | Frontend scaffold (K-003) |
+| SEC-006 | **SSE Reconnect Auth Race** — When PocketBase's SSE connection drops and auto-reconnects, the auth token may have expired, causing silent unauthenticated state. | MEDIUM | v0.2 (Kindling) | This is a client-side concern. The `PB_CONNECT` handler in R-004 addresses it, but it needs implementation in the React hooks. | Frontend realtime hooks (K-011) |
+| SEC-007 | **Secret Management in Docker** — `.env` files with HMAC secrets and API keys are readable by any process. Production should use Docker secrets or mounted files with restricted permissions. | LOW → HIGH | v1.0 (First Light) | Acceptable for development. Must be hardened before any real users. | Deployment hardening (F-010) |
+| SEC-008 | **Dependency Supply Chain** — Go modules pulled from the internet could be compromised. Need vulnerability scanning and version pinning. | LOW → MEDIUM | v1.0 (First Light) | Go's `go.sum` provides cryptographic verification. `govulncheck` should be added to CI before release. | CI pipeline |
+| SEC-009 | **LiveKit Room Name Guessability** — If room names in LiveKit are predictable (sequential IDs), token generation could be targeted. Room names should be UUIDs or random slugs. | HIGH | Sprint 1 (verify) | Already spec'd in E-024 — token endpoint verifies room membership. Flagged here as a reminder to verify the membership check is airtight during code review. | E-024 implementation |
+
+### Accepted Risks (Documented)
+
+| ID | Risk | Severity | Rationale | Mitigation |
+|----|------|----------|-----------|------------|
+| SEC-RISK-001 | **Screenshot prevention is impossible** in web browsers. Users can screenshot fading messages. | LOW | No reliable cross-browser API exists. Accepted as platform limitation. | Visual affordances (fading text "feels" impermanent) + community culture. Documented in Q-003. |
+| SEC-RISK-002 | **No E2EE until v2.0.** Server admin can theoretically read messages and listen to voice (LiveKit sees unencrypted audio). | MEDIUM | E2EE (Insertable Streams) is complex and deferred to v2.0. For self-hosted instances, the admin IS the user. | Messages auto-delete (TTL + VACUUM). Voice is never stored. Documented in BB-003. |
+
+---
 ## Production Incidents
 
 > No production incidents — project has not shipped yet.

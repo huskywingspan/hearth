@@ -1,0 +1,33 @@
+# PocketBase multi-stage build for Hearth
+# Uses pure-Go SQLite driver (modernc.org/sqlite) — no CGo needed
+# Final image: Alpine ~15MB + Go binary ~30MB ≈ ~45MB on disk
+
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /build
+
+# Cache dependency downloads
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+
+# Build the binary
+COPY backend/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -o hearth .
+
+# === Runtime image ===
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates wget
+
+WORKDIR /pb
+
+COPY --from=builder /build/hearth /usr/local/bin/hearth
+
+# PocketBase auto-creates pb_data/ on first run
+VOLUME /pb/pb_data
+
+EXPOSE 8090
+
+# Bind to all interfaces — Caddy handles external access.
+# In production with host networking, consider 127.0.0.1:8090 instead.
+ENTRYPOINT ["hearth", "serve", "--http=0.0.0.0:8090"]

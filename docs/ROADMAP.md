@@ -91,6 +91,12 @@
 | K-016 | Exponential backoff WebSocket reconnection | Build | Not Started | |
 | K-017 | Heartbeat-based presence display (30s interval) | Build | Not Started | |
 
+### Phase 0.2.S — Security Hardening (Frontend)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| SEC-005 | 🛡️ Migrate auth tokens from `localStorage` to `httpOnly` cookies | Security | Not Started | Custom `AuthStore` for PocketBase JS SDK. Prevents XSS token theft. |
+| SEC-006 | 🛡️ SSE reconnect auth validation | Security | Not Started | On `PB_CONNECT`, verify token validity and refresh. Prevent silent auth degradation. |
+
 ### Phase 0.2.C — Sound & Polish
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
@@ -156,6 +162,13 @@
 | F-012 | Self-hosting documentation | Docs | Not Started | |
 | F-013 | Performance profiling (1 vCPU, 1GB, ~20 users) | Test | Not Started | |
 | F-014 | Smoke test suite for full flow | Test | Not Started | |
+
+### Phase 1.0.S — Security Hardening (Pre-Production)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| SEC-007 | 🛡️ Docker secret management | Security | Not Started | Replace `.env` with Docker secrets or mounted files with `chmod 600`. No secrets in image layers. |
+| SEC-008 | 🛡️ Dependency vulnerability scanning | Security | Not Started | Add `govulncheck` to CI. Pin exact versions in `go.mod`. Audit dependency tree. |
+| SEC-009 | 🛡️ LiveKit room isolation audit | Security | Not Started | Verify room membership check in token endpoint is airtight. Confirm room names use UUIDs. |
 
 ---
 

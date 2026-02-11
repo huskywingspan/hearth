@@ -1,0 +1,83 @@
+# docker-compose.yaml — Hearth production deployment
+# Target: 1 vCPU, 1 GB RAM
+#
+# Usage:
+#   cp config/.env.example .env
+#   # Edit .env with your domain and secrets
+#   docker compose up -d
+
+services:
+  # === Caddy: TLS Termination + L4 SNI Routing ===
+  # Custom build with caddy-l4 + caddy-yaml modules
+  caddy:
+    build:
+      context: ./docker/caddy
+      dockerfile: Dockerfile
+    network_mode: "host"
+    volumes:
+      - caddy_data:/data/caddy
+      - ./config/caddy.yaml:/etc/caddy/caddy.yaml:ro
+    env_file: .env
+    command: caddy run --config /etc/caddy/caddy.yaml --adapter yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # === LiveKit: WebRTC SFU (Voice/Video) ===
+  # No Redis — single-node mode saves ~25MB RAM
+  livekit:
+    image: livekit/livekit-server:latest
+    network_mode: "host"
+    volumes:
+      - caddy_data:/data/caddy:ro       # Read TURN certificates from Caddy
+      - ./config/livekit.yaml:/etc/livekit.yaml:ro
+    command: --config /etc/livekit.yaml
+    environment:
+      - GOMEMLIMIT=400MiB               # Sacred memory budget
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - HEARTH_DOMAIN=${HEARTH_DOMAIN}
+    restart: unless-stopped
+    depends_on:
+      caddy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # === PocketBase: Backend API + Auth + Realtime ===
+  pocketbase:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.pocketbase
+    network_mode: "host"
+    volumes:
+      - pb_data:/pb/pb_data
+    environment:
+      - GOMEMLIMIT=250MiB               # Sacred memory budget
+      - HEARTH_DOMAIN=${HEARTH_DOMAIN}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - HMAC_SECRET_CURRENT=${HMAC_SECRET_CURRENT}
+      - HMAC_SECRET_OLD=${HMAC_SECRET_OLD}
+      - POW_DIFFICULTY=${POW_DIFFICULTY}
+      - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
+    restart: unless-stopped
+    depends_on:
+      caddy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  caddy_data:
+    driver: local
+  pb_data:
+    driver: local

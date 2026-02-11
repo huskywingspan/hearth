@@ -38,6 +38,8 @@ hearth/
 │   │   ├── invite.go            # HMAC invite token generation + validation
 │   │   ├── pow.go               # Proof-of-Work challenge endpoint
 │   │   ├── livekit_token.go     # LiveKit JWT generation for room access
+│   │   ├── ratelimit.go         # Per-IP and per-user rate limiting
+│   │   ├── sanitize.go          # Input sanitization for user-generated content
 │   │   └── metrics.go           # Prometheus /metrics endpoint
 │   └── hooks/
 │       └── hooks_test.go        # Unit + integration tests
@@ -65,6 +67,8 @@ hearth/
 | **0.3** | E-006 | Create Caddy config (L4 TLS SNI) | HTTPS terminates. `hearth.example → :8090`, `lk.hearth.example → :7880`, `turn.hearth.example → :5349`. |
 | **0.4** | E-007 | Create LiveKit config | LiveKit starts and accepts WebSocket connections on `:7880`. ICE Lite, DTX, no transcoding. |
 | **0.5** | — | `.env.example` + README | Self-hoster can clone, edit `.env`, `docker compose up -d`. |
+| **0.6** | E-040 | CORS policy on PocketBase | `AllowedOrigins` locked to `https://{HEARTH_DOMAIN}`. No wildcard in production. |
+| **0.7** | E-041 | CSP + security headers via Caddy | `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options` headers on all responses. |
 
 ### 0.1 — Scaffold Go Backend (E-004)
 
@@ -95,6 +99,8 @@ func main() {
     hooks.RegisterInvite(app)
     hooks.RegisterPoW(app)
     hooks.RegisterLiveKitToken(app)
+    hooks.RegisterRateLimit(app)
+    hooks.RegisterSanitize(app)
     hooks.RegisterMetrics(app)
 
     if err := app.Start(); err != nil {
@@ -165,6 +171,61 @@ Copy the complete YAML from [R-002 §Caddy Configuration](../research/R-002-cadd
 - LiveKit route (`lk.hearth.example`) = TLS termination + HTTP reverse proxy to `:7880`
 - PocketBase route (`hearth.example`) = TLS termination + HTTP reverse proxy to `:8090`
 - Domain names are parameterized via `{env.HEARTH_DOMAIN}` (read from `.env`)
+
+### 0.6 — CORS Policy (E-040)
+
+**Where:** PocketBase settings (programmatic via `app.OnServe()` or admin UI)
+
+CORS (Cross-Origin Resource Sharing) controls which websites can make API requests to your server. Without it, any website a user visits could silently use their Hearth session to send messages, create invites, or change settings.
+
+**Configuration:**
+```go
+// In app.OnServe() or via PocketBase admin Settings → Application
+// AllowedOrigins: only your Hearth domain
+app.Settings().Meta.AppURL = "https://hearth.example"
+```
+
+**Rules:**
+- Production: `AllowedOrigins` = `["https://hearth.example"]` — **never `*`**
+- Development: `AllowedOrigins` = `["http://localhost:5173"]` (Vite dev server)
+- `Access-Control-Allow-Credentials: true` only for the exact configured origin
+- Parameterize via `HEARTH_DOMAIN` env var so self-hosters don't need to edit code
+
+### 0.7 — CSP & Security Headers (E-041)
+
+**Where:** Caddy response headers (added to the HTTP routes in `caddy.yaml`)
+
+Content Security Policy tells the browser to only execute scripts from trusted sources. Even if an attacker somehow injects malicious HTML into a message, the browser refuses to run it.
+
+**Headers to add to all HTTP responses via Caddy:**
+
+```yaml
+# Add to the PocketBase HTTP route's handler in caddy.yaml
+headers:
+  Content-Security-Policy: >-
+    default-src 'self';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    connect-src 'self' wss://lk.{env.HEARTH_DOMAIN};
+    media-src 'self' blob:;
+    img-src 'self' data: blob:;
+    frame-ancestors 'none';
+    base-uri 'self';
+    form-action 'self'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: microphone=(self), camera=(), geolocation=()
+```
+
+**What each header does:**
+- **CSP:** Only allow scripts from our domain, only connect WebSockets to our LiveKit domain, no iframes (prevents clickjacking)
+- **X-Content-Type-Options: nosniff** — Prevents browsers from guessing file types (MIME sniffing attacks)
+- **X-Frame-Options: DENY** — Blocks embedding Hearth in an iframe (clickjacking prevention)
+- **Referrer-Policy** — Don't leak full URLs when navigating away
+- **Permissions-Policy** — Only allow microphone from our domain, block camera/geolocation by default
+
+⚠️ **`'unsafe-inline'` for styles:** Required because TailwindCSS and React may inject inline styles. `'unsafe-inline'` for `script-src` is intentionally NOT included — this is the line that blocks XSS.
 
 ### 0.4 — LiveKit Config (E-007)
 
@@ -465,6 +526,8 @@ app.Cron().MustAdd("hearth_presence_sweep", "*/2 * * * *", func() {
 | **2.3** | E-022 | HMAC invite validation | `POST /api/hearth/invite/validate` accepts valid tokens, rejects expired/tampered. Constant-time comparison. |
 | **2.4** | E-023 | Proof-of-Work challenge | `GET /api/hearth/pow/challenge` returns a puzzle. `POST /api/hearth/pow/verify` validates the solution. |
 | **2.5** | E-024 | LiveKit JWT token generation | `POST /api/hearth/rooms/:id/token` returns a LiveKit JWT with correct grants. `canPublishVideo: false` by default. |
+| **2.6** | E-042 | Rate limiting (per-IP + per-user) | Auth endpoints: 5 req/15min per IP. API: 60 req/min per IP, 30 msg/min per user. Rejects with 429. |
+| **2.7** | E-043 | Input sanitization on messages | HTML tags stripped server-side before save. Script injection produces escaped plaintext, not executable HTML. |
 
 ### 2.1 — Basic Auth (E-020)
 
@@ -531,6 +594,109 @@ func validateInvite(roomSlug string, timestamp int64, signature string, secrets 
 - `hmac.Equal()` uses `crypto/subtle.ConstantTimeCompare` internally — **never use `==` or `bytes.Equal`** for hash comparison (timing side-channel risk).
 - `secrets` is an array of `[currentKey, oldKey]` — the two-key rotation system. This provides a grace period when rotating keys.
 - On successful validation, create a `room_members` entry with `role: "guest"` and `vouched_by: null` (the Knock flow in v1.0 adds the voucher).
+
+### 2.6 — Rate Limiting (E-042)
+
+**File:** `backend/hooks/ratelimit.go`
+
+Rate limiting prevents a single user or attacker from overwhelming the server. On a 1 vCPU machine, even modest abuse can degrade the experience for everyone.
+
+**Implementation: Sliding-window token bucket in Go**
+
+```go
+type RateLimiter struct {
+    mu       sync.Mutex
+    buckets  map[string]*bucket // keyed by IP or userID
+}
+
+type bucket struct {
+    tokens    float64
+    lastCheck time.Time
+    maxTokens float64
+    refillRate float64 // tokens per second
+}
+```
+
+**Rate limits by endpoint category:**
+
+| Category | Key | Limit | Window | Response |
+|----------|-----|-------|--------|----------|
+| Auth (login/register) | IP | 5 requests | 15 minutes | `429 Too Many Requests` + `Retry-After` header |
+| Invite validation | IP | 10 requests | 1 minute | `429` |
+| General API | IP | 60 requests | 1 minute | `429` |
+| Message creation | User ID | 30 messages | 1 minute | `429` (prevents spam floods) |
+| Heartbeat | User ID | 6 requests | 1 minute | `429` (heartbeat is every 30s = 2/min normally) |
+
+**Registration as middleware:**
+```go
+func RegisterRateLimit(app *pocketbase.PocketBase) {
+    rl := NewRateLimiter()
+    
+    app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+        // Apply rate limiting to API routes
+        se.Router.Use(rl.Middleware())
+        return se.Next()
+    })
+    
+    // Sweep expired buckets every 5 minutes (memory hygiene)
+    app.Cron().MustAdd("hearth_ratelimit_sweep", "*/5 * * * *", func() {
+        rl.SweepStale(10 * time.Minute)
+    })
+}
+```
+
+**Key decisions:**
+- **In-memory only** — no Redis needed. A `sync.Mutex` map with periodic sweep.
+- **Per-IP for unauthenticated**, **per-user for authenticated** — prevents both external attacks and misbehaving insiders.
+- Return `Retry-After` header so well-behaved clients know when to retry.
+- **Log rate limit hits** at WARN level — this is an early indicator of abuse or misconfigured clients.
+- Stale bucket sweep prevents unbounded memory growth (cleanup entries older than 10 minutes).
+
+### 2.7 — Input Sanitization (E-043)
+
+**File:** `backend/hooks/sanitize.go`
+
+All user-generated text content is sanitized before being saved to the database. This is defense-in-depth — even though React escapes output by default, we strip dangerous content server-side so it never enters the data layer.
+
+**Implementation:**
+```go
+import "html"
+
+func RegisterSanitize(app *pocketbase.PocketBase) {
+    // Sanitize message body before creation
+    app.OnRecordCreate("messages").BindFunc(func(e *core.RecordEvent) error {
+        body := e.Record.GetString("body")
+        e.Record.Set("body", sanitizeText(body))
+        return e.Next()
+    })
+    
+    // Also sanitize on update
+    app.OnRecordUpdate("messages").BindFunc(func(e *core.RecordEvent) error {
+        body := e.Record.GetString("body")
+        e.Record.Set("body", sanitizeText(body))
+        return e.Next()
+    })
+}
+
+func sanitizeText(input string) string {
+    // HTML-escape any angle brackets, ampersands — turns <script> into &lt;script&gt;
+    sanitized := html.EscapeString(input)
+    // Enforce maximum message length (prevent payload bombs)
+    if len(sanitized) > 4000 {
+        sanitized = sanitized[:4000]
+    }
+    return sanitized
+}
+```
+
+**Also sanitize:**
+- `display_name` on user creation/update (same `html.EscapeString`)
+- `room.name` and `room.description` on room creation/update
+- Any field that ends up rendered in another user's browser
+
+**Why `html.EscapeString` and not a regex?** Go's `html.EscapeString` is part of the standard library, handles all HTML entities correctly, and doesn't try to be smart about "safe" tags. For a chat app with ephemeral messages, we don't need rich text — plain text with escaped entities is the right default.
+
+**Message length limit (4000 chars):** Prevents payload bombs where someone sends 10MB of text. Applied server-side regardless of what the client enforces.
 
 ### 2.4 — Proof-of-Work Challenge (E-023)
 
@@ -689,6 +855,12 @@ app.Logger() // PocketBase provides a structured logger
 | `TestLiveKitTokenGrants` | Generate token → decode JWT → verify grants match (no video, has audio) |
 | `TestAuthRegisterLogin` | Register user → login → get valid token → access protected endpoint |
 | `TestRoomMembershipRequired` | Non-member tries to get room token → 403 |
+| `TestRateLimitAuthEndpoint` | 6th login attempt within 15 min → 429 |
+| `TestRateLimitMessageSpam` | 31st message in 1 min → 429 |
+| `TestSanitizeScriptTag` | Message body `<script>alert(1)</script>` → stored as `&lt;script&gt;...` |
+| `TestSanitizeMaxLength` | 5000-char message → truncated to 4000 |
+| `TestCORSRejectUnknownOrigin` | Request with `Origin: https://evil.com` → no CORS headers |
+| `TestCSPHeadersPresent` | Any response includes `Content-Security-Policy` header |
 
 ---
 
@@ -700,7 +872,9 @@ Phase 0 (Scaffolding)
   ├── 0.2 Docker Compose ──── needs 0.1 (for Dockerfile)      │
   ├── 0.3 Caddy config ────── independent                     │
   ├── 0.4 LiveKit config ──── independent                     │
-  └── 0.5 .env + README ──── independent                      │
+  ├── 0.5 .env + README ──── independent                      │
+  ├── 0.6 CORS policy ─────── needs 0.1 (PocketBase config)   │
+  └── 0.7 CSP headers ─────── needs 0.3 (Caddy config)        │
                                                                │
 Phase 1 (Data Layer) ──── needs: Phase 0.1                     │
   ├── 1.1 SQLite PRAGMAs ─── first (runs on bootstrap)        │
@@ -715,7 +889,9 @@ Phase 2 (Auth & Security) ── needs: Phase 1.2 (collections)   │
   ├── 2.2 HMAC invite gen ── needs 2.1 (auth for access ctrl) │
   ├── 2.3 HMAC invite val ── needs 2.2                        │
   ├── 2.4 PoW challenge ──── independent                      │
-  └── 2.5 LiveKit JWT ─────── needs 1.2 + 2.1 (rooms + auth) │
+  ├── 2.5 LiveKit JWT ─────── needs 1.2 + 2.1 (rooms + auth) │
+  ├── 2.6 Rate limiting ───── independent (middleware)         │
+  └── 2.7 Input sanitize ──── needs 1.2 (message hooks)       │
                                                                │
 Phase 3 (Observability) ──── needs: Phase 0.1                  │
   ├── 3.1 /metrics ─────────── can start early                 │
@@ -746,6 +922,12 @@ Sprint 1 is complete when **ALL** of the following are true:
 - [ ] PoW: challenge → solve → verify
 - [ ] LiveKit JWT: authenticated member gets valid token with voice-only grants
 - [ ] `/metrics` returns Prometheus-format data
+- [ ] CORS: cross-origin requests from unauthorized origins are rejected
+- [ ] CSP + security headers present on all HTTP responses
+- [ ] Rate limiting: auth endpoints return 429 after 5 rapid attempts
+- [ ] Rate limiting: message creation returns 429 after 30/minute
+- [ ] Input sanitization: `<script>` in message body is escaped, not executed
+- [ ] Input sanitization: message body capped at 4000 characters
 - [ ] All unit tests pass (including with `-race` flag)
 - [ ] All integration tests pass
 - [ ] Memory usage stays under 250MB for PocketBase under basic load
@@ -756,19 +938,19 @@ Sprint 1 is complete when **ALL** of the following are true:
 
 | Phase | Subtasks | Estimated Effort | Parallelizable |
 |-------|----------|-----------------|----------------|
-| Phase 0 | 5 | 1 day | 0.3–0.5 can run in parallel |
+| Phase 0 | 7 | 1.5 days | 0.3–0.5 parallel; 0.6–0.7 after 0.1/0.3 |
 | Phase 1 | 6 | 2 days | 1.5 + 1.6 can run in parallel |
-| Phase 2 | 5 | 2 days | 2.4 is independent of 2.1–2.3 |
+| Phase 2 | 7 | 3 days | 2.4, 2.6 independent of 2.1–2.3; 2.7 needs 1.2 |
 | Phase 3 | 2 | 0.5 day | Both parallelizable with Phase 1 |
 | Phase 4 | 2 | 1.5 days | After Phases 1 + 2 |
-| **Total** | **20** | **~7 days** | |
+| **Total** | **24** | **~8.5 days** | |
 
 ---
 
 ## Handoff: Researcher → Builder
 
-**Task IDs:** E-004 through E-031
-**Context:** All research complete (R-001–R-006). Go API patterns verified. Docker templates ready. No open blockers.
+**Task IDs:** E-004 through E-043
+**Context:** All research complete (R-001–R-006). Go API patterns verified. Docker templates ready. Security gap analysis complete — 4 items added to this sprint, 5 deferred (see Security Concerns Tracker in PROJECT_CHRONICLE.md).
 **Deliverables:** This spec + 6 research reports in `docs/research/`
 **Blockers Resolved:** PocketBase API version (R-001), TLS routing (R-002), container topology (R-003/ADR-001)
 **Open Items:** PocketBase CGo vs pure-Go SQLite driver — Builder should verify during E-004

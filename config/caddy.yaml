@@ -1,0 +1,90 @@
+# caddy.yaml — Hearth reverse proxy configuration
+# Custom Caddy build required: caddy-l4 + caddy-yaml modules
+# Loaded with: caddy run --config /etc/caddy/caddy.yaml --adapter yaml
+
+logging:
+  logs:
+    default:
+      level: WARN
+
+# Storage for TLS certificates
+storage:
+  module: file_system
+  root: /data/caddy
+
+apps:
+  # === Layer 4: TLS SNI Routing ===
+  layer4:
+    servers:
+      main:
+        listen:
+          - ":443"
+        routes:
+          # Route 1: TURN traffic → LiveKit's built-in TURN server
+          # Raw TLS passthrough — LiveKit handles its own TLS for TURN
+          - match:
+              - tls:
+                  sni:
+                    - "turn.{env.HEARTH_DOMAIN}"
+            handle:
+              - handler: proxy
+                upstreams:
+                  - dial:
+                      - "localhost:5349"
+
+          # Route 2: LiveKit signaling (WebSocket API)
+          # TLS terminated at Caddy → plaintext HTTP to LiveKit
+          - match:
+              - tls:
+                  sni:
+                    - "lk.{env.HEARTH_DOMAIN}"
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial:
+                      - "localhost:7880"
+
+          # Route 3: PocketBase API + SPA
+          # TLS terminated at Caddy → plaintext HTTP to PocketBase
+          - match:
+              - tls:
+                  sni:
+                    - "{env.HEARTH_DOMAIN}"
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial:
+                      - "localhost:8090"
+
+  # === HTTP: ACME Challenge + HTTPS Redirect ===
+  http:
+    http_port: 80
+    servers:
+      http_redirect:
+        listen:
+          - ":80"
+        routes:
+          - match:
+              - path:
+                  - "/.well-known/acme-challenge/*"
+            # ACME challenges handled automatically by Caddy
+          - handle:
+              - handler: static_response
+                status_code: 301
+                headers:
+                  Location:
+                    - "https://{http.request.host}{http.request.uri}"
+
+  # === TLS: Certificate Management ===
+  tls:
+    automation:
+      policies:
+        - subjects:
+            - "{env.HEARTH_DOMAIN}"
+            - "lk.{env.HEARTH_DOMAIN}"
+            - "turn.{env.HEARTH_DOMAIN}"
+          issuers:
+            - module: acme
+              # email: admin@hearth.example  # Uncomment in production
