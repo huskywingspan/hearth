@@ -84,6 +84,13 @@ func ensureRoomsCollection(app core.App) error {
 		return nil // already exists
 	}
 
+	// Look up the actual users collection ID — PocketBase requires
+	// RelationField.CollectionId to be the real ID, not the name.
+	usersCol, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return fmt.Errorf("users collection not found: %w", err)
+	}
+
 	collection := core.NewBaseCollection("rooms")
 
 	collection.Fields.Add(&core.TextField{
@@ -104,7 +111,7 @@ func ensureRoomsCollection(app core.App) error {
 	collection.Fields.Add(&core.RelationField{
 		Name:          "owner",
 		Required:      true,
-		CollectionId:  "users",
+		CollectionId:  usersCol.Id,
 		MaxSelect:     1,
 		CascadeDelete: false,
 	})
@@ -155,12 +162,22 @@ func ensureMessagesCollection(app core.App) error {
 		return nil
 	}
 
+	// Look up actual collection IDs (PocketBase requires real IDs, not names)
+	roomsCol, err := app.FindCollectionByNameOrId("rooms")
+	if err != nil {
+		return fmt.Errorf("rooms collection not found: %w", err)
+	}
+	usersCol, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return fmt.Errorf("users collection not found: %w", err)
+	}
+
 	collection := core.NewBaseCollection("messages")
 
 	collection.Fields.Add(&core.RelationField{
 		Name:          "room",
 		Required:      true,
-		CollectionId:  "rooms",
+		CollectionId:  roomsCol.Id,
 		MaxSelect:     1,
 		CascadeDelete: true,
 	})
@@ -168,7 +185,7 @@ func ensureMessagesCollection(app core.App) error {
 	collection.Fields.Add(&core.RelationField{
 		Name:          "author",
 		Required:      true,
-		CollectionId:  "users",
+		CollectionId:  usersCol.Id,
 		MaxSelect:     1,
 		CascadeDelete: false,
 	})
@@ -204,12 +221,22 @@ func ensureRoomMembersCollection(app core.App) error {
 		return nil
 	}
 
+	// Look up actual collection IDs (PocketBase requires real IDs, not names)
+	roomsCol, err := app.FindCollectionByNameOrId("rooms")
+	if err != nil {
+		return fmt.Errorf("rooms collection not found: %w", err)
+	}
+	usersCol, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return fmt.Errorf("users collection not found: %w", err)
+	}
+
 	collection := core.NewBaseCollection("room_members")
 
 	collection.Fields.Add(&core.RelationField{
 		Name:          "room",
 		Required:      true,
-		CollectionId:  "rooms",
+		CollectionId:  roomsCol.Id,
 		MaxSelect:     1,
 		CascadeDelete: true,
 	})
@@ -217,7 +244,7 @@ func ensureRoomMembersCollection(app core.App) error {
 	collection.Fields.Add(&core.RelationField{
 		Name:          "user",
 		Required:      true,
-		CollectionId:  "users",
+		CollectionId:  usersCol.Id,
 		MaxSelect:     1,
 		CascadeDelete: true,
 	})
@@ -231,7 +258,7 @@ func ensureRoomMembersCollection(app core.App) error {
 
 	collection.Fields.Add(&core.RelationField{
 		Name:         "vouched_by",
-		CollectionId: "users",
+		CollectionId: usersCol.Id,
 		MaxSelect:    1,
 	})
 
