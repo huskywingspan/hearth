@@ -2,7 +2,7 @@
 
 > **Codename:** Project Vesta | **Product Name:** Hearth
 > **Phase:** Research & Exploration
-> **Last Updated:** 2026-02-10
+> **Last Updated:** 2026-02-11
 
 ---
 
@@ -21,6 +21,95 @@ To build **Hearth**: a privacy-first, self-hosted, modular communication platfor
 - Privacy by default. No telemetry. E2EE where feasible.
 - Constraint-driven engineering: every byte and CPU cycle matters.
 - Sound fades, memories soften, doors must be opened from the inside.
+
+---
+
+## 1.1 PRODUCT PHILOSOPHY
+
+> "100% of what 90% of people will use" — Hearth must be **feature-complete** before marketing. Users don't adopt platforms that feel unfinished. The gap between Hearth and the group chat they already use must be zero for common features, with Hearth's unique qualities (fading chat, spatial voice, privacy, warmth) as the pull.
+
+### The North Star: 5 Minutes to Voice
+
+**From clicking a link to being in a voice Den: 5 minutes or less.** This is the UX benchmark. Every design decision is measured against it.
+
+### Product Principles
+
+| # | Principle | Meaning |
+|---|----------|--------|
+| 1 | **5-Minute-to-Voice** | From clicking a link to being in a voice Den: 5 minutes or less. Every friction point is a dropout. |
+| 2 | **No Account Required** | The Knock system lets guests join with just a display name. Account creation is an upgrade, not a gate. |
+| 3 | **QR Code Connect** | Homeowners share their House via QR code (printed, texted, displayed on a screen). Scan → connect → Knock. Zero typing of URLs. |
+| 4 | **Feature Complete Before Marketing** | Don't announce until the basics work flawlessly. Missing image sharing or emoji reactions makes Hearth feel "not ready." |
+| 5 | **PWA First** | Mobile is a first-class citizen via Progressive Web App. Install from browser, push notifications, offline support. Native wrapper (Capacitor) comes later. |
+
+### 5-Minute Onboarding Trace
+
+| Step | Time | Action | Hearth Moment |
+|------|------|--------|---------------|
+| 0:00 | +0s | Friend sends QR code / link via existing group chat | "Check out where we're hanging out" |
+| 0:10 | +10s | Click link → hearthapp.chat landing page | See philosophy, one-click "Connect to a House" |
+| 0:30 | +30s | Enter House URL or scan QR code | Dynamic server connect — no app install needed |
+| 0:45 | +45s | See the Door → enter display name → Knock | "Sarah is at the door" — host hears knock sound |
+| 1:30 | +90s | Host approves → Guest enters the House | Warm transition animation, welcome message |
+| 2:00 | +120s | Browse Dens, see who's around, read recent chat | Presence indicators, ambient cues |
+| 2:30 | +150s | Click into a Den → join Table voice | Ember glow, spatial audio — **they're in** |
+| 3:30 | +210s | Talking, laughing, reacting to messages | The magic moment — this is the "Digital Living Room" |
+
+### Feature Completeness Audit ("100% of 90%")
+
+Features that 90% of users in a Discord/group chat use daily. Every row must be green before v1.0 marketing.
+
+| Feature | Discord Has It | Hearth Status | Target Version | Notes |
+|---------|---------------|---------------|----------------|-------|
+| Text chat (persistent) | ✅ | ✅ Dens | v0.3 | Schema in FF-001 |
+| Ephemeral chat | ❌ | ✅ Campfires | v0.2 | Unique differentiator |
+| Voice chat | ✅ | 🔲 Planned | v0.4 | Table + 4 Corners |
+| Image / file sharing | ✅ | 🔲 Not planned | v1.0 | **Critical gap.** PocketBase has built-in file storage. |
+| Emoji reactions | ✅ | 🔲 Not planned | v1.0 | Unicode-only. No custom emoji for v1.0. |
+| Reply / thread | ✅ | 🔲 Not planned | v1.0 | Reply-to with scroll-to-parent. No full threads for v1.0. |
+| @mentions | ✅ | 🔲 Not planned | v1.0 | `@name` with notification highlight. |
+| Message search | ✅ | 🔲 Not planned | v1.0 | SQLite FTS5 — zero dependencies. Dens only (Campfires are ephemeral). |
+| Push notifications | ✅ | 🔲 Not planned | v1.0 | PWA + Web Push API. Service Worker. |
+| Edit / delete own messages | ✅ | 🔲 Not planned | v1.0 | Essential. "Oops" safety net. |
+| User avatars | ✅ | 🔲 Not planned | v1.0 | Upload or generated (initials/Dicebear). PocketBase file field. |
+| Link previews | ✅ | 🔲 Not planned | v1.0 | Server-side OpenGraph fetch. Privacy: proxy through PB, don't leak user IPs. |
+| Pinned messages | ✅ | 🔲 Not planned | v1.0 | Per-Den. Simple boolean field on messages. |
+| DMs | ✅ | 🔲 Planned | v0.3 | Schema in FF-004. E2EE at v1.0. |
+| Screen share | ✅ | 🔲 Not planned | v1.1+ | Post-MVP. CPU-heavy. |
+| Video | ✅ | 🔲 Planned | v0.4 | 480p/15fps ambient. Not a video call replacement. |
+
+### Friction Map
+
+Every point where a potential user might abandon the flow.
+
+| Dropout Point | Friction | Fix |
+|--------------|---------|-----|
+| "What is this?" | Link looks unfamiliar | Landing page: 3 seconds to understand value prop |
+| "Do I have to install something?" | App install is a hard stop | PWA — works in browser, optional install |
+| "I have to make an account?" | Registration fatigue | The Knock — guest access with display name only |
+| "How do I find the server?" | Manual URL entry is error-prone | QR code connect — scan and go |
+| "Nobody's here" | Empty room = abandoned | Presence hints on Front Porch ("3 people chatting") |
+| "This is confusing" | Unfamiliar UI | Guided first visit: one Den, one action (join voice) |
+| "I can't send a picture" | Missing basic feature | Feature completeness before marketing (see audit above) |
+| "It doesn't work on my phone" | No mobile app | PWA with responsive design, push notifications |
+
+### Mobile Progression
+
+| Phase | Approach | When | Investment |
+|-------|---------|------|------------|
+| **Phase 1** | PWA (Service Worker + Web Push API + responsive UI) | v1.0 | Low — it's the same React app |
+| **Phase 2** | Capacitor wrapper (native shell around the PWA) | Post-v1.0 | Medium — native push, app store listing |
+| **Phase 3** | Evaluate React Native **only if** PWA hits a wall | Never (unless forced) | High — avoid unless absolutely necessary |
+
+The PWA approach means Hearth works on every phone from day one. No app store gatekeeping. "Built by a guy in his room" is a feature, not a limitation — it means no corporate incentives to add tracking or dark patterns.
+
+### Market Position
+
+Hearth is not competing with Discord for millions of users. Hearth competes with **the group chat your friend group already has** — iMessage, WhatsApp, a neglected Discord server. The pitch is: "What if your group chat had a living room you could walk into?"
+
+**Target audience:** Self-hosters, privacy-conscious friend groups, small communities (5–30 people), remote families, tabletop gaming groups, creative collectives.
+
+**Positioning:** A "beloved niche tool" like Immich (photos), Jellyfin (media), or Mealie (recipes) — thousands of passionate users, not millions of indifferent ones.
 
 ---
 
@@ -101,54 +190,93 @@ Opus 1.5+ DRED (Deep Redundancy) is enabled client-side for resilience against V
 
 ## 3. CORE FEATURES & UX PATTERNS
 
-### A. The Portal (Ambient Spatial Voice)
+### The House (Server Architecture)
 
-**Mental Model:** An abstract topological space — not an RPG map. A dinner table, not a dungeon.
+A Hearth server is a **House** — a single self-hosted instance where a small group lives. The House has Dens (permanent rooms), a Backyard (where Campfires burn), and DMs (private conversations).
 
-**Key Design Decisions (from UX research):**
-- **Reject WASD navigation.** Current spatial platforms (Gather.town) force avatar micro-management that causes "navigation fatigue." Users divert cognitive resources to movement instead of conversation.
-- **Click-to-Drift:** Users click a destination or person; their representation "drifts" there automatically with fluid easing. Reduces motor load.
-- **Magnetic Zones:** When drifting near a conversation circle, the interface gently snaps/gravitates the user into the group — mimicking the social gravity of joining a real circle.
-- **No "God View" Dissonance:** Avoid top-down maps where you see people you can't hear. Visual affordances must match audio affordances.
+**Roles — Who Lives Here:**
 
-**Audio Visualization — Gradient Ripples:**
+| Role | Capabilities | Assignment |
+|------|-------------|------------|
+| **Homeowner** | Full server control. Create/delete Dens and Campfires. Manage all settings. Assign Keyholders. | First account (server setup) |
+| **Keyholder** | Create/configure Dens and Campfires (if delegated by Homeowner). Moderate delegated spaces. | Assigned by Homeowner |
+| **Member** | Join Dens and Campfires. Send messages. Join voice. | Any authenticated user |
+| **Guest** | Session-bound visitor via The Knock. Limited to approved space. | Arrives via Knock, vouched by host |
 
-| Visual State | Audio Equivalent | Implementation |
-|-------------|----------------|----------------|
-| Speaking (Near) | Direct sound | Avatar border pulses with high opacity, warm "ember" glow |
-| Speaking (Mid) | Early reflections | Semi-transparent border; ripple expands showing range |
-| Speaking (Far) | Reverberant field | "Ghostly" low-opacity; blurred waveform |
-| Silence | Ambient presence | Soft static glow (breathing animation) |
+### A. Dens (Permanent Rooms + Optional Voice)
 
-- **Opacity = Volume.** Distant users appear semi-transparent; approaching makes them solid.
-- **Soft Occlusion:** Audio behind barriers uses low-pass filtering (muffling) instead of hard cutoff. Maintains awareness ("mumbling in the kitchen") without compromising private conversation.
-- **"Lean In" / Focus Cursor:** Click-and-hold on a user to beamform — boost their audio, duck surrounding noise. Visual spotlight effect.
+> **Replaces:** "Portal" (retired — see ADR-007)
 
-### B. Campfires (Ephemeral Chat)
+**Mental Model:** A room in the house. The living room, the study, the game room. Permanent text history, with optional voice and video.
+
+**Text:** Persistent messages. Searchable. New member history visibility is **configurable per-Den** — the Homeowner sets a server default, and can delegate the choice to Den creators. Den types: general discussion, topic-focused, announcement.
+
+**Voice — Table + 4 Corners:**
+
+Voice in Dens uses a **discrete spatial model**, not continuous topology:
+
+- **The Table** — Central area where everyone hears everyone equally. Default position on join. Like sitting at a dinner table together.
+- **4 Corners** — Semi-private positions. Moving to a Corner with another person creates a quieter side conversation (reduced Table volume, boosted Corner partner). Like stepping aside at a party.
+- **Navigation:** Click to move between Table ↔ Corner positions. No WASD, no coordinate dragging. Simple, intentional.
+
+**Audio visualization** still applies but simplified for discrete positions:
+
+| Visual State | Position | Implementation |
+|-------------|----------|----------------|
+| Speaking at Table | Table | Avatar pulses with warm "Ember" glow; visible to all |
+| Speaking in Corner | Corner | Ember glow visible to Corner partners; dimmed to Table |
+| Silence | Any | Soft breathing animation (ambient presence) |
+
+- **Ember** glow for active speakers (warm pulse, not green ring).
+- **"Lean In"** — Click-and-hold on a user at Table to boost their audio, duck others. Focus cursor.
+
+**Video (when enabled):**
+- Max 480p, 15fps — "ambient video" / "picture frame" aesthetic, not video call.
+- Simulcast disabled. Dynacast enabled (pause unsubscribed after 5s).
+- Default: `canPublishVideo: false` in JWT. Homeowner/Keyholder enables per-Den.
+
+### B. Campfires (Ephemeral Chat — The Backyard)
 
 **Core Principle:** Messages are ephemeral thoughts, not permanent records. This combats "archival anxiety" and the "exhibition effect" where users self-censor because they're creating a permanent, searchable record.
 
+**Location:** Campfires live in the **Backyard** — the outdoor annex to the House. They're casual, impermanent, disposable. A Campfire self-destructs when its last messages fade.
+
+**Fade Time:** Configurable by the Campfire creator (within bounds set by the Homeowner). Slider from minutes to hours.
+
 **4-Stage Transparency Decay:**
 
-| Stage | Opacity | Trigger | Purpose |
-|-------|---------|---------|---------|
-| Fresh | 100% | Message sent | Active conversation |
-| Fading | 50% | Time elapsed / pushed up by newer messages | "Past context, not current" |
-| Echo | 10% | Further decay | Visual texture of "past chatter" — the room feels lived-in |
-| Gone | 0% | `expires_at` reached | Client + server deletion |
+| Stage | Opacity | Visual | Purpose |
+|-------|---------|--------|---------|
+| Fresh | 100% | Full color | Active conversation |
+| Fading | 50% | Reduced saturation | "Past context, not current" |
+| Echo | 10% | Blurred + gray shift | Visual texture of "past chatter" — the room feels lived-in |
+| Gone | 0% | Removed | Client + server deletion |
 
 **Implementation:**
 - CSS `animation-delay` driven (negative delay starts mid-fade for page reloads), NOT JavaScript loops. Saves mobile battery.
+- **Echo stage enhancement** (from R-009 gap analysis): Add `filter: blur(1px)` and gray color shift at the Echo stage, not just opacity reduction. Creates the "Ghost Text" effect described in the UX research.
 - Server: Cron-based "Lazy Sweep" GC runs every minute, bulk-deletes via indexed `expires_at`. No per-message timers.
 - Nightly `VACUUM` for physical data erasure (logical `DELETE` only marks pages as free).
 
 **Typing Presence — "Mumbling":**
-- Instead of "User is typing..." (which creates performance anxiety), show a blurred waveform or abstract "scribbles" indicating rhythm, length, and intensity without revealing content.
-- Mimics hearing someone take a breath to speak.
+- Instead of "User is typing..." (which creates performance anxiety), show a blurred waveform or abstract "scribbles" indicating **rhythm, length, and intensity** without revealing content.
+- Fast flurry = excited. Slow deliberate strokes = thoughtful. Mimics hearing someone take a breath to speak.
 
 **The "Drunk Test":** Does the user feel safe enough to say something stupid? The visual language of fading text must reinforce impermanence — light, airy, and translucent, not solid like a legal document.
 
-### C. The Knock (Security & Onboarding)
+### C. DMs (Direct Messages)
+
+**Persistence:** Permanent (like Dens). DMs are private letters, not campfire whispers.
+
+**Features:**
+- 1:1 text conversations between any two Members.
+- Optional 1:1 voice/video call (direct WebRTC, no Table/Corners model).
+- E2EE at v1.0 (simpler key exchange — only 2 parties).
+- No group DMs for v1.0 (Dens serve that purpose).
+
+**Privacy:** DM history lives on the server (PocketBase), encrypted at rest via E2EE. The Homeowner cannot read E2EE DMs even with database access.
+
+### D. The Knock (Security & Onboarding)
 
 **Problem:** Invite links (Discord/Zoom) are impersonal and abuse-prone. Account creation funnels are high-friction. Zoom's waiting room is "purgatory."
 
@@ -156,7 +284,7 @@ Opus 1.5+ DRED (Deep Redundancy) is enabled client-side for resilience against V
 
 1. **The Doorstep (Guest View):** Guest clicks Hearth link → sees a "Door" → enters display name + optional note → "Knocks."
 2. **The Peephole (Host View):** Host hears subtle knock sound → notification: "Sarah is at the door" → can peek without guest knowing.
-3. **Opening the Door:** Host clicks "Let In" → guest transitions from waiting to living room.
+3. **Opening the Door:** Host clicks "Let In" → guest transitions from waiting to the House.
 4. **Account Upgrade:** Guest is a session-bound visitor. If they want to return later, *then* prompted to "claim this key" (create account). Gradual engagement.
 
 **The "Front Porch" (Waiting UI):**
@@ -171,11 +299,11 @@ Opus 1.5+ DRED (Deep Redundancy) is enabled client-side for resilience against V
 - Server validates: check expiry (`t < now`), compute `HMAC_SHA256(secret, r + "." + t)`, constant-time compare with `s`.
 - Zero database hits. Secret rotation instantly revokes all outstanding invites.
 
-### D. Cartridges (Extensibility — Future Phase)
+### E. Cartridges (Extensibility — Future Phase)
 
 **Problem:** Running external bot processes (Node.js, Python) consumes 50–100MB each on a 1GB server.
 
-**Solution:** Embedded WebAssembly plugins via **Extism**. Plugins compile to `.wasm` binaries and run inside the PocketBase process.
+**Solution:** Embedded WebAssembly plugins via **Extism**. Plugins compile to `.wasm` binaries and run inside the PocketBase process. Developers can write Cartridges in Rust, Go, or **JavaScript (via QuickJS→Wasm compilation)** — making the ecosystem accessible to web developers.
 
 **Host-Guest Interface:**
 1. Event triggers (e.g., `OnBeforeMessageCreate`) → load plugin → serialize message data into Wasm memory → call `process()` → return allow/deny or modified content → destroy instance.
@@ -248,7 +376,8 @@ Dynamic mixing: ambient volume rises during conversation lulls, ducks when someo
 |-----------|-------------|
 | **Stateless HMAC Invites** | Self-validating tokens (no DB storage). Secret rotation = instant revocation. |
 | **Proof-of-Work** | Client Puzzle Protocol on public endpoints (login, join). 1–3s for humans, prohibitive for bots. No CAPTCHAs. |
-| **WebRTC E2EE** | Insertable Streams — browser encrypts frames before WebRTC stack. LiveKit sees only encrypted blobs. (Future phase) |
+| **Chat E2EE (v1.0)** | Campfire + DM messages encrypted client-side. Server stores ciphertext only. Key exchange via public keys on user records. |
+| **Voice E2EE (v2.0)** | Insertable Streams — browser encrypts audio frames before WebRTC stack. LiveKit sees only encrypted blobs. |
 | **Wasm Sandboxing** | Capability-based: whitelisted domains, memory caps, scoped KV. Plugins cannot read files or open arbitrary sockets. |
 | **Crypto Hygiene** | Constant-time comparison for all hash checks. No timing side-channels. |
 | **Key Rotation** | Two-key system (Current + Old with grace period). Drop Old → all old invites instantly invalid. |
@@ -274,6 +403,13 @@ Dynamic mixing: ambient volume rises during conversation lulls, ducks when someo
 - Mobile-first responsive design.
 - Aggressive code-splitting via `React.lazy`.
 - Only show tools when needed — UI "breathes" with conversation ("Radical Quiet").
+- **Radical Quiet spec:** Auto-hide all chrome (sidebar, toolbars, mute buttons) after N seconds of pure conversation. Show on hover/tap. The UI should disappear when you're just talking.
+
+### 6.5 Navigation (from R-009 Gap Analysis)
+- **Do NOT use Discord's "Left Sidebar Server List" pattern.** (UX Research §5.2 explicitly warns against this.)
+- Current `RoomList.tsx` sidebar is functional scaffolding for development — it will be replaced.
+- Target: **House navigation model** — visualize the House as a place, not a folder tree. Dens are rooms you walk between. Campfires are visible in the Backyard. DMs are a separate private drawer.
+- **Sliding pane transitions** between Dens (View Transitions API or Framer Motion) — maintain spatial continuity.
 
 ---
 
@@ -286,6 +422,7 @@ Dynamic mixing: ambient volume rises during conversation lulls, ducks when someo
 | **Guilded / Revolt** | Feature-bloat Discord clones — copy the UI, add more buttons | Contextual minimalism — "Home" metaphor, not server/channel folders |
 | **Gather.town** | Gamification trap — pixel art, WASD navigation fatigue, "toy not tool" | Abstract topology, click-to-drift, magnetic zones |
 | **Zoom** | Scheduled, performative, waiting room purgatory | Ambient always-on presence; "Front Porch" with hospitality |
+| **iMessage / WhatsApp / Signal** | No voice presence, no "room" concept, group chats are flat text | Always-on voice Dens, spatial audio, visual warmth, fading Campfires |
 
 ---
 
@@ -310,12 +447,14 @@ Dynamic mixing: ambient volume rises during conversation lulls, ducks when someo
 
 | Release | Codename | Goal | Target |
 |---------|----------|------|--------|
-| **v0.1** | Ember | Backend skeleton + chat API (no frontend) | Apr 2026 |
-| **v0.2** | Kindling | Frontend shell + Campfire (fading chat) | Jun 2026 |
-| **v0.3** | Hearth Fire | Voice — The Portal (spatial audio) | Aug 2026 |
-| **v1.0** | First Light | Full MVP: chat + voice + Knock + deployment | Oct 2026 |
-| **v1.1** | Warm Glow | Polish, accessibility, admin tools | Dec 2026 |
-| **v2.0** | Open Flame | Cartridges (plugin system) + E2EE | Q1 2027 |
+| **v0.1** | Ember | Backend skeleton + chat API (no frontend) | Feb 2026 ✅ |
+| **v0.2** | Kindling | Frontend shell + Campfire (fading chat) | Feb 2026 ✅ |
+| **v0.2.1** | Settling In | Integration fixes + access model simplification | Feb 2026 ✅ |
+| **v0.3** | First Friend | Remote access, Den/Campfire schema, landing page, QR connect flow | Apr 2026 |
+| **v0.4** | Hearth Fire | Voice — Dens with Table + 4 Corners spatial audio | Jun 2026 |
+| **v1.0** | First Light | Full MVP: Knock + Chat features (images, reactions, replies, search) + Admin roles + Chat E2EE + PWA + deployment | Oct 2026 |
+| **v1.1** | Warm Glow | Polish, accessibility, House navigation model, screen share | Dec 2026 |
+| **v2.0** | Open Flame | Cartridges (plugin system) + Voice E2EE + Hearth Persona (DID) + native mobile wrapper | Q1 2027 |
 
 ---
 
@@ -350,9 +489,12 @@ hearth/
 
 ## 11. OPEN QUESTIONS & FUTURE EXPLORATION
 
-- **Matrix Protocol Integration?** UX report suggests running on Matrix but hiding it. Evaluate complexity vs. federation benefits.
-- **Generative Ambience Engine:** How to implement lightweight procedural audio (fire, rain) without large asset downloads?
-- **Screenshot Prevention:** Feasibility of screenshot detection/notification in a web app context.
-- **Video Policy:** When and how to enable video beyond voice-first? Per-room toggle? Host-controlled?
-- **Plugin Marketplace:** How to distribute Cartridges? Curated vs. open? Signing requirements?
-- **Accessibility:** How do spatial audio and fading text work for screen readers and hearing-impaired users?
+- **Matrix Protocol Integration?** UX report suggests running on Matrix but hiding it. Evaluate complexity vs. federation benefits. Current lean: No — build native PocketBase-first. Revisit federation in v3+ if demand exists.
+- **Generative Ambience Engine:** How to implement lightweight procedural audio (fire, rain) without large asset downloads? Options: pre-recorded loops (simple) vs. Web Audio oscillators (zero download) vs. tiny ML models (too CPU-heavy).
+- **Screenshot Prevention:** No reliable cross-browser API exists. Accepted as platform limitation (SEC-RISK-001). Rely on visual affordances.
+- **Plugin Marketplace:** How to distribute Cartridges? Curated vs. open? Signing requirements? Deferred to v2.0.
+- **Accessibility:** How do spatial audio and fading text work for screen readers and hearing-impaired users? Needs early research to avoid costly retrofitting.
+- **House Navigation Model:** How to visualize the House as a place, not a folder tree? Key Ring? Neighborhood Map? (UX Research §5.2) — defines the core UI differentiation from Discord.
+- **Docker vs systemd:** Technical Research §7.1 recommended systemd for memory savings (~100MB). We chose Docker for UX simplicity. Tradeoff accepted (see ADR-007 notes, R-009 gap analysis).
+- **Hearth Persona (Cross-Server Identity):** DID-based portable identity for users across multiple Houses. Research task R-010.
+- **RTT Intimacy Mode:** Optional per-relationship live typing for very close friends. v2.0+ feature.

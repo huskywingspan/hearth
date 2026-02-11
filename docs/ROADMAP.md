@@ -1,7 +1,7 @@
 # Hearth — Release Roadmap & Task Breakdown
 
 > **Last Updated:** 2026-02-11
-> **Phase:** v0.2.1 Settling In complete — ready for v0.3 Hearth Fire
+> **Phase:** v0.2.1 Settling In complete — ready for v0.3 First Friend
 
 ---
 
@@ -9,13 +9,16 @@
 
 | Release | Codename | Goal | Target |
 |---------|----------|------|--------|
-| **v0.1** | Ember | Backend skeleton + chat MVP (no voice) | Apr 2026 |
-| **v0.2** | Kindling | Frontend shell + Campfire (fading chat) | Jun 2026 |
-| **v0.2.1** | Settling In | Integration fixes + access model simplification | Feb 2026 |
-| **v0.3** | Hearth Fire | Voice — The Portal (spatial audio) | Aug 2026 |
-| **v1.0** | First Light | Full MVP: chat + voice + Knock + deployment | Oct 2026 |
-| **v1.1** | Warm Glow | Polish, accessibility, admin tools | Dec 2026 |
-| **v2.0** | Open Flame | Cartridges (plugin system) + E2EE | Q1 2027 |
+| **v0.1** | Ember | Backend skeleton + chat MVP (no voice) | Feb 2026 ✅ |
+| **v0.2** | Kindling | Frontend shell + Campfire (fading chat) | Feb 2026 ✅ |
+| **v0.2.1** | Settling In | Integration fixes + access model simplification | Feb 2026 ✅ |
+| **v0.3** | First Friend | Remote access, Den/Campfire schema, landing page, QR connect flow | Apr 2026 |
+| **v0.4** | Hearth Fire | Voice — Dens with Table + 4 Corners spatial audio | Jun 2026 |
+| **v1.0** | First Light | Full MVP: Knock + Chat features (images, reactions, replies, mentions, search, edit/delete) + Admin roles + Chat E2EE + PWA + avatars + link previews + pinned messages + deployment | Oct 2026 |
+| **v1.1** | Warm Glow | Polish, accessibility, House navigation model, screen share | Dec 2026 |
+| **v2.0** | Open Flame | Cartridges (plugin system) + Voice E2EE + Hearth Persona (DID) + native mobile (Capacitor) | Q1 2027 |
+
+> **Product Principle:** "100% of what 90% of people will use." See `vesta_master_plan.md` §1.1 for the full feature completeness audit and 5-minute-to-voice onboarding trace.
 
 ---
 
@@ -166,41 +169,87 @@
 
 ---
 
-## v0.3 — "Hearth Fire" (Voice — The Portal)
+## v0.3 — "First Friend" (Remote Access + Den/Campfire Schema)
 
-**Goal:** Spatial voice working in the browser. The abstract topological space UI with proximity-based volume attenuation.
+**Goal:** A friend outside the LAN can connect, see the House, and chat in a Den. Landing page at hearthapp.chat. Schema supports the new channel architecture (ADR-007).
 
-### Phase 0.3.A — LiveKit Integration
+> **ADR:** [`docs/adr/ADR-007-channel-architecture.md`](adr/ADR-007-channel-architecture.md) — Dens, Campfires, DMs, roles.
+
+### Phase 0.3.A — Schema & Architecture (ADR-007)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| FF-001 | Add `type` field to rooms collection (`den` \| `campfire`) | Build | Not Started | Incremental migration pattern |
+| FF-002 | Add `voice`, `video`, `history_visible` fields to rooms | Build | Not Started | Dens get voice option |
+| FF-003 | Add `role` field to users (`homeowner` \| `keyholder` \| `member`) | Build | Not Started | First user = homeowner |
+| FF-004 | Create `direct_messages` + `dm_messages` collections | Build | Not Started | Permanent DM storage |
+| FF-005 | Add `public_key` field to users (empty for now, E2EE readiness) | Build | Not Started | Schema prep for v1.0 |
+| FF-006 | Seed default Den ("The Den") on first startup | Build | Not Started | Auto-created if no dens exist |
+| FF-007 | Update API rules: Homeowner/Keyholder can create dens; anyone can create campfires (configurable) | Build | Not Started | |
+| FF-008 | Ghost Text enhancement: blur + gray shift at Echo stage in campfire.css | Build | Not Started | R-009 gap finding #4 |
+
+### Phase 0.3.B — Remote Access (Cloudflare Tunnel)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| FF-010 | Research: Cloudflare Tunnel setup for PocketBase | Research | Not Started | Zero-config remote access |
+| FF-011 | Tunnel configuration (cloudflared) + documentation | Build | Not Started | |
+| FF-012 | Connect-to-server flow (enter server URL in frontend) | Build | Not Started | Dynamic PocketBase endpoint |
+| FF-013 | First-impression audit: what does a new user see? | Design | Not Started | Onboarding polish |
+| FF-014 | QR code generation for House URL | Build | Not Started | Homeowner generates QR → share via text/print. Zero URL typing. |
+| FF-015 | QR code scan/connect flow in frontend | Build | Not Started | Camera access → decode → connect |
+| FF-016 | PWA manifest + Service Worker (install prompt, offline shell) | Build | Not Started | Mobile as first-class citizen |
+
+### Phase 0.3.C — Landing Page (hearthapp.chat)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| FF-020 | Scaffold Astro landing page | Build | Not Started | Cloudflare Pages deployment |
+| FF-021 | Design + content: philosophy, screenshots, "try it" CTA | Design | Not Started | |
+| FF-022 | Domain setup (hearthapp.chat on Cloudflare) | Ops | Not Started | ~$6/year |
+
+### Phase 0.3.D — Frontend Updates
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| FF-030 | Separate Den view and Campfire view in frontend | Build | Not Started | Different UI for permanent vs ephemeral |
+| FF-031 | DM UI (basic: list conversations, send messages) | Build | Not Started | |
+| FF-032 | Role indicators in UI (Homeowner badge, Keyholder badge) | Build | Not Started | |
+| FF-033 | Fade time slider for Campfire creators | Build | Not Started | |
+
+---
+
+## v0.4 — "Hearth Fire" (Voice — Table + 4 Corners)
+
+**Goal:** Spatial voice working in Dens. The Table + 4 Corners model with discrete positioning and Ember glow.
+
+### Phase 0.4.A — LiveKit Integration
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
 | H-001 | Research: LiveKit client SDK (React) — connection, tracks, events | Research | ✅ Done | R-005 complete. See [`R-005`](research/R-005-livekit-react-sdk.md) |
 | H-002 | Research: Web Audio API spatial audio (PannerNode, HRTF) | Research | ✅ Done | R-006 complete. PannerNode linear model. See [`R-006`](research/R-006-web-audio-spatial.md) |
 | H-003 | LiveKit client connection + room join flow | Build | Not Started | |
 | H-004 | Audio track publish/subscribe | Build | Not Started | DTX + Opus DRED config |
-| H-005 | Proximity-based volume attenuation (distance → gain) | Build | Not Started | |
+| H-005 | Table position: equal volume for all participants | Build | Not Started | |
+| H-006 | Corner positions: semi-private spatial audio | Build | Not Started | PannerNode linear distance model |
 
-### Phase 0.3.B — Portal UI
+### Phase 0.4.B — Den Voice UI
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| H-010 | Abstract topological space canvas | Build | Not Started | Not an RPG map |
-| H-011 | Click-to-drift navigation with easing | Build | Not Started | No WASD |
-| H-012 | Magnetic zones (auto-snap to conversation circles) | Build | Not Started | |
-| H-013 | Gradient ripple visualization (opacity = volume) | Build | Not Started | |
-| H-014 | "Ember" glow for active speakers | Build | Not Started | Warm pulse, not green ring |
-| H-015 | "Lean In" focus cursor (beamforming UX) | Build | Not Started | Click-hold to boost one source |
+| H-010 | Table + Corners layout — click to move between positions | Build | Not Started | Discrete positions, not continuous |
+| H-011 | "Ember" glow for active speakers | Build | Not Started | Warm pulse via AnalyserNode |
+| H-012 | "Lean In" focus cursor (boost one source, duck others) | Build | Not Started | Click-hold to beamform |
+| H-013 | Voice activity detection (VAD) integration | Build | Not Started | |
+| H-014 | Mute/unmute controls + push-to-talk option | Build | Not Started | |
 
-### Phase 0.3.C — Audio Polish
+### Phase 0.4.C — Audio Polish
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| H-020 | Soft occlusion: low-pass filter behind barriers | Build | Not Started | |
+| H-020 | Soft occlusion: low-pass filter for Corner → Table audio bleed | Build | Not Started | |
 | H-021 | Dynacast pause for unsubscribed video | Build | Not Started | |
-| H-022 | Voice activity detection (VAD) integration | Build | Not Started | |
+| H-022 | Video cap enforcement: 480p/15fps max | Build | Not Started | Per ADR-007 |
 
 ---
 
 ## v1.0 — "First Light" (Full MVP)
 
-**Goal:** Ship a complete, self-hostable Hearth instance with chat, voice, onboarding, and Docker deployment.
+**Goal:** Ship a complete, self-hostable Hearth instance with chat (Dens + Campfires + DMs), voice, onboarding (The Knock), admin roles, Chat E2EE for Campfires and DMs, and Docker deployment.
 
 ### Phase 1.0.A — The Knock (Onboarding)
 | ID | Task | Type | Status | Notes |
@@ -208,11 +257,28 @@
 | F-001 | "Door" landing page (guest enters name + note) | Build | Not Started | |
 | F-002 | "Peephole" notification for host | Build | Not Started | Knock sound, peek without guest knowing |
 | F-003 | "Front Porch" waiting UI (blurred activity hints) | Build | Not Started | |
-| F-004 | "Let In" → instant transition to room | Build | Not Started | |
+| F-004 | "Let In" → instant transition to House | Build | Not Started | |
 | F-005 | Vouched entry: "Guest of [Host]" in user list | Build | Not Started | |
 | F-006 | Guest-to-account upgrade ("claim this key") | Build | Not Started | Gradual engagement |
 
-### Phase 1.0.B — Deployment
+### Phase 1.0.B — Chat E2EE (Campfires + DMs)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| F-020 | Research: Chat E2EE implementation for PocketBase | Research | Not Started | R-011 |
+| F-021 | `public_key` enrollment flow for users | Build | Not Started | |
+| F-022 | Client-side encryption/decryption for Campfire messages | Build | Not Started | |
+| F-023 | Client-side encryption/decryption for DMs | Build | Not Started | |
+| F-024 | Key exchange mechanism (Signal Protocol or simpler?) | Build | Not Started | |
+
+### Phase 1.0.C — Admin Roles
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| F-030 | Homeowner/Keyholder/Member role enforcement in API rules | Build | Not Started | ADR-007 |
+| F-031 | Admin UI for role assignment | Build | Not Started | |
+| F-032 | Per-Den history visibility configuration | Build | Not Started | |
+| F-033 | Server-wide Campfire settings (fade time bounds, creation permissions) | Build | Not Started | |
+
+### Phase 1.0.D — Deployment
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
 | F-010 | Multi-stage Docker build (Alpine, static Go binary) | Build | Not Started | |
@@ -220,6 +286,23 @@
 | F-012 | Self-hosting documentation | Docs | Not Started | |
 | F-013 | Performance profiling (1 vCPU, 1GB, ~20 users) | Test | Not Started | |
 | F-014 | Smoke test suite for full flow | Test | Not Started | |
+
+### Phase 1.0.E — Feature Completeness ("100% of 90%")
+
+> These features close the gap between Hearth and what users expect from any modern chat platform. See `vesta_master_plan.md` §1.1 for the full audit table and rationale.
+
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| FC-001 | Image / file sharing (upload + display + download) | Build | Not Started | PocketBase file field. Max size configurable by Homeowner. |
+| FC-002 | Emoji reactions on messages | Build | Not Started | Unicode emoji picker. Reaction counts on messages. |
+| FC-003 | Reply-to messages (with scroll-to-parent) | Build | Not Started | `reply_to` relation on messages. Visual thread line. |
+| FC-004 | @mentions with notification highlight | Build | Not Started | `@name` autocomplete, highlight in message list, notify target. |
+| FC-005 | Message search (Dens only) | Build | Not Started | SQLite FTS5 — zero external deps. Campfires excluded (ephemeral). |
+| FC-006 | Push notifications (PWA Web Push API) | Build | Not Started | Service Worker + VAPID keys. Mention/DM/Knock triggers. |
+| FC-007 | Edit / delete own messages | Build | Not Started | Edit shows "(edited)" indicator. Delete shows "message removed." |
+| FC-008 | User avatars (upload or generated) | Build | Not Started | PocketBase file field on users. Fallback: Dicebear or initials. |
+| FC-009 | Link previews (OpenGraph) | Build | Not Started | Server-side fetch via PB hook. Privacy: proxy through PB, don't leak user IPs. |
+| FC-010 | Pinned messages (per-Den) | Build | Not Started | Boolean `pinned` field. Pinned message drawer in Den UI. |
 
 ### Phase 1.0.S — Security Hardening (Pre-Production)
 | ID | Task | Type | Status | Notes |
@@ -234,16 +317,20 @@
 
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| W-001 | Admin dashboard (room, user, plugin management) | Build | Not Started | |
-| W-002 | Accessibility audit (screen readers, fading text, spatial audio) | Research | Not Started | Critical open question |
-| W-003 | Light mode ("Cream" palette) | Build | Not Started | |
-| W-004 | Keyboard navigation + ARIA for all components | Build | Not Started | |
-| W-005 | systemd bare-metal deployment alternative | Build | Not Started | |
-| W-006 | Admin guide documentation | Docs | Not Started | |
+| W-001 | **House navigation model** — replace sidebar list with spatial/visual House metaphor | Build | Not Started | #1 differentiator from R-009 gap analysis |
+| W-002 | Sliding pane transitions between Dens (View Transitions API / Framer Motion) | Build | Not Started | Spatial continuity |
+| W-003 | Radical Quiet: auto-hide chrome during conversation | Build | Not Started | UX Research §5.3 |
+| W-004 | Accessibility audit (screen readers, fading text, spatial audio) | Research | Not Started | Critical open question |
+| W-005 | Light mode ("Cream" palette) | Build | Not Started | |
+| W-006 | Keyboard navigation + ARIA for all components | Build | Not Started | |
+| W-007 | Admin guide documentation | Docs | Not Started | |
+| W-008 | Sound design integration (thock, cork pop, foley) | Build | Not Started | R-007 |
+| W-009 | Screen share (WebRTC `getDisplayMedia`) | Build | Not Started | CPU-heavy — post-MVP. Low-res, Den-only. |
+| W-010 | Group DMs (if demand exists post-v1.0) | Build | Not Started | v1.0 is 1:1 only; Dens serve group use case |
 
 ---
 
-## v2.0 — "Open Flame" (Plugins + E2EE)
+## v2.0 — "Open Flame" (Plugins + Voice E2EE + Persona)
 
 ### Cartridges (Plugin System)
 | ID | Task | Type | Status | Notes |
@@ -255,26 +342,39 @@
 | O-005 | Memory-capped instance pool (50MB) | Build | Not Started | |
 | O-006 | Example plugins: moderation filter, `/roll` | Build | Not Started | |
 | O-007 | Plugin developer docs + PDK examples | Docs | Not Started | |
+| O-008 | QuickJS→Wasm support for JavaScript Cartridges | Build | Not Started | R-009 gap finding #7 |
 
-### E2EE
+### Voice E2EE
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
 | O-010 | Research: Insertable Streams API — browser support, perf impact | Research | Not Started | |
 | O-011 | WebRTC E2EE via Insertable Streams | Build | Not Started | |
-| O-012 | Key exchange mechanism (public key + room key distribution) | Build | Not Started | |
-| O-013 | Security audit (HMAC, PoW, Wasm sandbox, E2EE) | Test | Not Started | |
+| O-012 | Key exchange mechanism for voice rooms | Build | Not Started | |
+| O-013 | Security audit (HMAC, PoW, Wasm sandbox, all E2EE) | Test | Not Started | |
+
+### Hearth Persona (Cross-Server Identity)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| O-020 | Research: DID-based portable identity | Research | Not Started | R-010 |
+| O-021 | Persona creation + export/import flow | Build | Not Started | |
+| O-022 | Cross-House identity resolution | Build | Not Started | |
+
+### Native Mobile (Capacitor Wrapper)
+| ID | Task | Type | Status | Notes |
+|----|------|------|--------|-------|
+| O-030 | Capacitor project setup (wrapping PWA) | Build | Not Started | Native push, app store listing |
+| O-031 | iOS + Android builds and testing | Build | Not Started | |
+| O-032 | App store submission (if warranted by demand) | Ops | Not Started | |
 
 ---
 
 ## Milestone Summary
 
 ```
-Feb 2026  ████░░░░░░░░░░░░░░░░  v0.0 — Research & Foundation
 Feb 2026  █████░░░░░░░░░░░░░░░  v0.2.1 — Settling In (Integration Fixes) ✅
-Apr 2026  ████████░░░░░░░░░░░░  v0.1 — Ember (Backend API)
-Jun 2026  ████████████░░░░░░░░  v0.2 — Kindling (Frontend + Chat)
-Aug 2026  ████████████████░░░░  v0.3 — Hearth Fire (Voice) ← NEXT
-Oct 2026  ██████████████████░░  v1.0 — First Light (MVP Ship)
-Dec 2026  ███████████████████░  v1.1 — Warm Glow (Polish)
-Q1  2027  ████████████████████  v2.0 — Open Flame (Plugins + E2EE)
+Apr 2026  ███████░░░░░░░░░░░░░  v0.3 — First Friend (Remote + Schema + QR Connect) ← NEXT
+Jun 2026  ██████████░░░░░░░░░░  v0.4 — Hearth Fire (Voice + Table/Corners)
+Oct 2026  ██████████████░░░░░░  v1.0 — First Light (MVP + Feature Complete + PWA)
+Dec 2026  ████████████████░░░░  v1.1 — Warm Glow (Polish + House Nav + Screen Share)
+Q1  2027  ████████████████████  v2.0 — Open Flame (Plugins + Voice E2EE + Persona + Native Mobile)
 ```

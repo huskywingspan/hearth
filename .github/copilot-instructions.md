@@ -29,7 +29,7 @@ Hearth is a privacy-first, self-hosted, modular communication platform — a "Di
 ## Code Style & Conventions
 - **TypeScript**: Strict mode. Functional React components. No class components.
 - **Go**: Follow standard Go conventions. Minimize allocations in hot paths.
-- **Naming**: Use the Hearth vocabulary — "Portal" (ambient voice), "Campfire" (ephemeral chat), "Knock" (guest entry), "Cartridge" (plugin).
+- **Naming**: Use the Hearth vocabulary — "House" (server), "Den" (permanent room + optional voice), "Campfire" (ephemeral chat in the Backyard), "DM" (direct message), "Knock" (guest entry), "Cartridge" (plugin), "Homeowner" (server admin), "Keyholder" (delegated admin).
 - **Components**: Mobile-first responsive. Aggressive code-splitting via React.lazy.
 - **CSS**: TailwindCSS utility classes. Custom design tokens for the "Subtle Warmth" palette.
 - **Testing**: Unit tests for all business logic. Integration tests for PocketBase hooks and LiveKit signaling.
@@ -88,12 +88,12 @@ hearth/
 - Do NOT add telemetry, analytics, or tracking of any kind.
 - Do NOT use heavy frameworks (Next.js, Remix) — Vite + React SPA only.
 - Do NOT introduce external database dependencies (Postgres, Redis, Mongo).
-- Do NOT use permanent message storage as the default. Messages fade.
-- Do NOT copy Discord's "server/channel" vocabulary or left-sidebar layout.
+- Do NOT use permanent message storage as the default. Campfire messages fade. Dens are permanent.
+- Do NOT copy Discord's "server/channel" vocabulary or left-sidebar layout. Use House/Den/Campfire vocabulary.
 - Do NOT use pixel art, chibi avatars, or gamified aesthetics. Keep it "high-end cozy."
 
 ## Current Phase
-**Research & Exploration** — Defining architecture, collecting research, stubbing out the design document. No production code yet.
+**v0.2.1 Settling In complete.** Backend (PocketBase + Go hooks, 36 tests) and frontend (React + Vite, ~85KB gzipped) working on LAN. ADR-007 accepted (Dens, Campfires, DMs, roles). Product philosophy established (§1.1): "100% of 90%", 5-min-to-voice, QR code connect, PWA-first mobile. Next: **v0.3 First Friend** (remote access + schema + landing page + QR connect).
 
 ## Key Project Documents
 - **`vesta_master_plan.md`** — Master design & technical specification

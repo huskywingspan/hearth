@@ -1,6 +1,6 @@
 # Hearth — Research Backlog & Open Questions
 
-> **Last Updated:** 2026-02-11 (R-008 completed)
+> **Last Updated:** 2026-02-11 (R-009 gap analysis completed, ADR-007 accepted)
 > **Owner:** Researcher Agent
 
 ---
@@ -54,7 +54,29 @@
 **Status:** Complete — 2026-02-11 | **Report:** [`docs/research/R-008-css-animation-performance.md`](research/R-008-css-animation-performance.md)
 **Outcome:** CSS `opacity` animations run on the compositor thread (GPU-accelerated), safely handling 200+ concurrent fades at 60 FPS on desktop. Real constraint is GPU memory from layer promotion (~128KB per 400×80 message), not CPU. `content-visibility: auto` (Baseline 2024, all major browsers) provides browser-native virtualization with zero JS overhead. `animationend` event for DOM cleanup keeps active message count bounded. **No JS virtualization library needed.** TanStack Virtual deferred as documented fallback. `will-change` explicitly rejected (browser auto-promotes). **Campfire CSS decay engine is unblocked.**
 
-### R-009: Pre-Alpha Marketing Prep — Reddit Post & Community Strategy
+### R-009: Research Gap Analysis — Ideas We Left Behind ✅ COMPLETE
+**Priority:** High | **Blocks:** ADR-007, Sprint 4 planning
+**Status:** Complete — 2026-02-11 | **Report:** [`docs/research/R-009-research-gap-analysis.md`](research/R-009-research-gap-analysis.md)
+**Outcome:** Compared original research reports against master plan. 80% of ideas carried forward. Key findings: (1) We built Discord's sidebar layout despite research warning against it — House navigation model needed for v1.1. (2) Room type enum was in original research — carried into ADR-007. (3) Docker vs systemd tradeoff was undocumented pivot. (4) Ghost Text Echo stage lost blur+gray shift. (5) Video cap (480p) undefined for voice rooms. Full ranked list of 10 lost ideas with sprint targets.
+
+### R-010: Hearth Persona — Cross-Server Identity (DID)
+**Priority:** Low | **Blocks:** O-020, O-021
+**Question:** How to implement DID-based portable identity so users can carry their persona across multiple Houses (Hearth instances)?
+**Context:** Users should be able to prove they're "the same person" across Houses without a central authority. DIDs (Decentralized Identifiers) offer self-sovereign identity. Need to evaluate: did:key, did:web, did:peer methods. Key questions: storage of DID documents, key rotation, revocation, trust establishment between Houses.
+**Deliverable:** Research report with recommended DID method, implementation architecture, and library evaluation.
+**Timing:** v2.0 — not blocking any current sprint.
+**Status:** Not started.
+
+### R-011: Chat E2EE for Campfires + DMs
+**Priority:** High | **Blocks:** F-020 through F-024
+**Question:** How to implement client-side encryption for Campfire messages and DMs in a PocketBase backend?
+**Context:** ADR-007 approved E2EE for Campfires + DMs at v1.0, Dens deferred to v2.0. Need to evaluate: Signal Protocol (double ratchet) vs simpler approaches, key exchange mechanism (leveraging `public_key` on user records), key management for ephemeral Campfire messages (key lifespan = message lifespan), group key distribution for Campfires (multiple participants), backward secrecy implications for new Campfire joiners.
+**Special constraint:** Campfires are ephemeral — keys can be short-lived. DMs are permanent — keys must support long-term storage.
+**Deliverable:** Research report with protocol choice, implementation architecture, library evaluation (libsignal-protocol-javascript, tweetnacl), and PocketBase integration pattern.
+**Timing:** Pre-v1.0 — needed before F-020.
+**Status:** Not started.
+
+### R-009-M: Pre-Alpha Marketing Prep — Reddit Post & Community Strategy
 **Priority:** Medium | **Blocks:** M-001 through M-006
 **Question:** What's the optimal framing, post structure, subreddit targeting, and visual assets needed for Hearth's first public reveal? How do competing projects (Revolt, Element, Mumble) position themselves, and how do we differentiate?
 **Deliverable:** Reddit post draft, "Why not X?" FAQ, competitive positioning guide, README polish spec, visual asset checklist.
@@ -88,14 +110,11 @@
 **Current Lean:** Accept limitation. Rely on visual affordances (fading text "feels" impermanent) and culture. Document as a known limitation.
 **Status:** Parked.
 
-### Q-004: Video Policy
+### Q-004: Video Policy ✅ RESOLVED
 **Source:** Technical Research (Section 3.3)
 **Question:** When and how to enable video beyond voice-first default?
-**Options:**
-1. Host-controlled room toggle (`allowVideo: true/false`)
-2. Per-user permission escalation (host grants `canPublishVideo` to specific users)
-3. "Picture frame" mode — low-res, low-fps ambient video (webcam as portrait, not video call)
-**Status:** Deferred to v0.3 research.
+**Answer:** ADR-007 resolves this: 480p max, 15fps, simulcast disabled, dynacast enabled. `canPublishVideo: false` by default in JWT. Homeowner/Keyholder enables per-Den.
+**Resolved by:** ADR-007 (2026-02-11).
 
 ### Q-005: Plugin Marketplace
 **Source:** Master Plan (Section 11)
@@ -134,3 +153,4 @@
 | R-005 | LiveKit React SDK Lifecycle | 2026-02-10 | Two API surfaces (LiveKitRoom stable, SessionProvider beta). `RemoteAudioTrack.setWebAudioPlugins()` for spatial audio. Custom PortalAudioRenderer pattern. |
 | R-006 | Web Audio Spatial Audio (2D) | 2026-02-10 | PannerNode linear distance model, equalpower panning, Z=0 for 2D. Complete `useSpatialAudio` hook. ~2% CPU at 20 participants. |
 | R-008 | CSS Animation Performance (Fading) | 2026-02-11 | Compositor-thread GPU animation safe at 200+ concurrent. `content-visibility: auto` for browser-native virtualization. No JS libs needed. TanStack Virtual deferred as fallback. |
+| R-009 | Research Gap Analysis | 2026-02-11 | Compared research reports vs master plan. 80% carry-through. Key drops: sidebar layout warning, room type enum, Docker pivot, Ghost Text detail. Top 10 ranked lost ideas. ADR-007 informed. |

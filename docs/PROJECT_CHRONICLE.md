@@ -15,8 +15,9 @@
 | **Master Specification** | ✅ Complete | `vesta_master_plan.md` — 11 sections, fully expanded |
 | **Technical Research** | ✅ Complete | PocketBase/SQLite, LiveKit, Extism/Wasm, security |
 | **UX Research** | ✅ Complete | Spatial audio, ephemeral messaging, cozy UI, onboarding |
-| **Release Roadmap** | ✅ Complete | 6 releases (v0.1 Ember → v2.0 Open Flame) with task IDs |
-| **Research Backlog** | ✅ Complete | 8 research tasks: R-001 through R-006 + R-008 ✅ complete. R-007 remaining (medium priority, blocks sound only). 7 open questions. |
+| **Release Roadmap** | ✅ Complete | 7 releases (v0.1 Ember → v2.0 Open Flame) with task IDs. §1.1 product philosophy added. |
+| **Research Backlog** | ✅ Complete | 11 research tasks: R-001 through R-006 + R-008 + R-009 ✅ complete. R-007 (medium), R-010 + R-011 (not started). 6 open questions, 2 resolved. |
+| **Product Philosophy** | ✅ Complete | §1.1: "100% of 90%" principle, 5-min-to-voice north star, feature audit, friction map, mobile strategy, market positioning |
 | **Agent Roles** | ✅ Complete | Builder, Researcher, Reviewer — specialized for Hearth |
 | **Backend (PocketBase)** | ✅ Complete | v0.1 Ember shipped. Auth, CRUD, GC, presence, HMAC, PoW, LiveKit JWT. 36/36 tests. |
 | **Frontend (React/Vite)** | ✅ Complete | v0.2 Kindling + v0.2.1 Settling In shipped. Integration bugs fixed (BUG-012→016). |
@@ -28,8 +29,9 @@
 - **v0.1 — Ember** (Backend skeleton + chat API) — COMPLETE ✅
 - **v0.2 — Kindling** (Frontend + Campfire chat) — COMPLETE ✅
 - **v0.2.1 — Settling In** (Integration fixes + access model) — COMPLETE ✅ (incl. Sprint 3.1 review fixes)
-- Next: **v0.3 Hearth Fire** (Voice — The Portal) — Target: Aug 2026
-- Marketing prep: Post #1 (r/selfhosted concept pitch) targeted for end of v0.2 polish
+- Next: **v0.3 First Friend** (Remote access, Den/Campfire schema, landing page) — Target: Apr 2026
+- Then: **v0.4 Hearth Fire** (Voice — Table + 4 Corners) — Target: Jun 2026
+- Marketing prep: Post #1 (r/selfhosted concept pitch) targeted for **after v1.0 feature completeness** ("Feature Complete Before Marketing" principle)
 
 ---
 
@@ -95,6 +97,15 @@
 | 2026-02-11 | **Sprint 3 Code Review (Reviewer Agent)** | Reviewer found 2 critical, 2 medium, 2 low issues. **Critical #1:** Builder had relaxed `messages` API rules to `@request.auth.id != ""`, violating ADR-006 spec ("Keep messages rules requiring membership"). **Critical #2:** Three sanitize tests still asserted HTML escaping behavior from pre-PIVOT-004. **Medium:** `room_members` had no `UpdateRule`. Sprint 3.1 spec created. |
 | 2026-02-11 | **Sprint 3.1 Review Fixes Complete** | Builder applied all 3 fixes from Reviewer. Messages API rules restored to require `room_members_via_room` membership (defense-in-depth). Three stale sanitize tests updated to assert passthrough (PIVOT-004 alignment). `room_members.UpdateRule` set to room-owner-only. All tests green, frontend builds clean. **Lesson:** The review→fix cycle caught a security regression that would have allowed any authed user to read/write messages to any room without joining. |
 | 2026-02-11 | **BUG-017: author_name Schema Migration Missing** | Second LAN test confirmed chat works but all users show "Wanderer". Root cause: `ensureMessagesCollection()` returns early if collection exists from Sprint 1 — the `author_name` field added in Sprint 3 was never applied. PocketBase silently discards `Set()` calls for non-existent fields. Fix: added incremental field check (same pattern as `ensureUsersFields()`). **Lesson:** All `ensureXxxCollection` functions must support incremental field addition, not just initial creation. |
+| 2026-02-11 | **R-009 Gap Analysis Complete** | Compared original research reports (Technical + UX) against master plan. ~80% of ideas carried forward. Key findings: (1) UX Research §5.2 explicitly warned against left sidebar server list — we built one (functional scaffolding, to be replaced). (2) Room type enum from Tech Research §2.1.2 was dropped but now restored via ADR-007. (3) Docker is an undocumented pivot from systemd recommendation. (4) Ghost Text Echo stage lost blur+gray detail. (5) Video cap (480p) was undefined. Top 10 lost ideas ranked by impact. |
+| 2026-02-11 | **ADR-007: Channel Architecture Accepted** | Major architecture revision. "Portal" retired. New vocabulary: House (server), Den (permanent room + optional voice), Campfire (ephemeral chat in the Backyard), DM (permanent direct messages). Voice model: Table + 4 Corners (discrete positions, not continuous topology). Admin roles: Homeowner → Keyholder → Member → Guest. E2EE scope for v1.0: Campfires + DMs only. New member history: configurable per-Den. Video: 480p/15fps max. |
+| 2026-02-11 | **Roadmap Restructured** | v0.3 becomes "First Friend" (remote access + schema + landing page). Voice pushed to v0.4 "Hearth Fire" (Table + Corners). v1.0 gains Chat E2EE (Campfires+DMs) and admin roles. v2.0 gets Voice E2EE + Hearth Persona (DID). R-010 (cross-server identity) and R-011 (chat E2EE) added to research backlog. |
+| 2026-02-11 | **Mobile Strategy Defined** | PWA-first approach: Service Worker + Web Push API at v1.0, Capacitor wrapper at v2.0, React Native only if PWA hits a hard wall. "No app store gatekeeping" aligned with privacy-first philosophy. |
+| 2026-02-11 | **Market Viability Analysis** | Honest assessment: Hearth is not competing with Discord for millions of users. Competing with the group chat (iMessage/WhatsApp/neglected Discord) that friend groups already have. Positioning as a "beloved niche tool" like Immich/Jellyfin/Mealie — thousands of passionate self-hosters, not millions of indifferent users. Bear case: network effects, self-hosting friction, privacy fatigue. Bull case: always-on voice is underserved, self-hosting is growing, aesthetic differentiation is real, "built by a guy in his room" is a feature. |
+| 2026-02-11 | **Product Philosophy Established (§1.1)** | Five product principles codified: (1) 5-Minute-to-Voice — north star UX benchmark, (2) No Account Required — Knock system for guest access, (3) QR Code Connect — scan and go, zero URL typing, (4) Feature Complete Before Marketing — don't announce until basics work, (5) PWA First — mobile is day-one citizen. Full onboarding trace mapped (0:00→3:30). |
+| 2026-02-11 | **Feature Completeness Audit** | "100% of what 90% of people will use" analysis. Identified 10 critical gaps vs. Discord baseline: image/file sharing, emoji reactions, reply-to, @mentions, message search (FTS5), push notifications, edit/delete, user avatars, link previews, pinned messages. All added to v1.0 roadmap as Phase 1.0.E (FC-001→FC-010). Friction map created with 8 dropout points and fixes. iMessage/WhatsApp/Signal added to competitive positioning. |
+| 2026-02-11 | **QR Code Connect Added to v0.3** | FF-014 (QR generation) and FF-015 (QR scan/connect) added to First Friend sprint. Homeowner generates QR for their House URL → share via text, print, or screen display. Eliminates manual URL entry friction. |
+| 2026-02-11 | **Roadmap v1.0 Scope Expanded** | v1.0 "First Light" now includes Phase 1.0.E (Feature Completeness: FC-001→FC-010), PWA setup (FF-016), QR code connect prep. v1.1 gains screen share (W-009) and group DMs (W-010). v2.0 gains native mobile via Capacitor (O-030→O-032). |
 
 ---
 
@@ -298,6 +309,29 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 
 ---
 
+### ADR-007: Channel Architecture — Dens, Campfires, DMs & Roles
+
+**Date:** February 11, 2026 | **Status:** ✅ Accepted
+
+**Context:** Through v0.2.1, Hearth had a flat model: rooms (campfires) with fading text. The original "Portal" concept (continuous-topology spatial voice) was overengineered for v1.0. Users need permanent text rooms, DMs, and admin delegation.
+
+**Decision:** Three channel types:
+- **Den** — Permanent text + optional voice (Table + 4 Corners spatial model)
+- **Campfire** — Ephemeral fading text (in the Backyard, configurable fade time)
+- **DM** — Permanent 1:1 messages
+
+Admin roles: **Homeowner** (server admin) → **Keyholder** (delegated admin) → **Member** → **Guest**
+
+E2EE scope: Campfires + DMs at v1.0. Dens + voice at v2.0.
+
+New member history: Configurable per-Den by admin or room creator.
+
+"Portal" is **retired**. Voice uses discrete Table + Corners model, not continuous topology.
+
+**Full spec:** [`docs/adr/ADR-007-channel-architecture.md`](adr/ADR-007-channel-architecture.md)
+
+---
+
 ### ADR-006: Simplified Access Model for Pre-v1.0
 
 **Date:** February 11, 2026 | **Status:** Proposed
@@ -430,7 +464,7 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 | ID | Risk | Severity | Rationale | Mitigation |
 |----|------|----------|-----------|------------|
 | SEC-RISK-001 | **Screenshot prevention is impossible** in web browsers. Users can screenshot fading messages. | LOW | No reliable cross-browser API exists. Accepted as platform limitation. | Visual affordances (fading text "feels" impermanent) + community culture. Documented in Q-003. |
-| SEC-RISK-002 | **No E2EE until v2.0.** Server admin can theoretically read messages and listen to voice (LiveKit sees unencrypted audio). | MEDIUM | E2EE (Insertable Streams) is complex and deferred to v2.0. For self-hosted instances, the admin IS the user. | Messages auto-delete (TTL + VACUUM). Voice is never stored. Documented in BB-003. |
+| SEC-RISK-002 | **No E2EE until v1.0 for chat, v2.0 for voice.** Server admin can theoretically read messages and listen to voice (LiveKit sees unencrypted audio). | MEDIUM | Chat E2EE (Campfires + DMs) moved to v1.0 per ADR-007. Voice E2EE deferred to v2.0. For self-hosted instances, the admin IS the user. | Messages auto-delete (TTL + VACUUM). Voice is never stored. Chat E2EE at v1.0. Documented in BB-003. |
 
 ---
 ## Production Incidents
@@ -616,11 +650,23 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 **Why Deferred:** Needs dedicated audio engineering research. Pre-recorded loops are simpler for v0.2. Procedural generation could be a distinguishing feature but isn't MVP-critical.
 **Revisit When:** After v0.2 ships with basic sound design.
 
-### BB-003: Insertable Streams E2EE
+### BB-003: Insertable Streams Voice E2EE
 **Source:** Technical Research (Section 5.3)
 **Idea:** WebRTC E2EE where the browser encrypts audio/video frames before the WebRTC stack. LiveKit sees only encrypted blobs ("trust the math, not the admin").
-**Why Deferred:** Complex key management (room key distribution, rotation, revocation). Browser API support still evolving. Scheduled for v2.0 but could be deferred further.
-**Revisit When:** v1.0 is stable and security audit is complete.
+**Why Deferred:** Complex key management (room key distribution, rotation, revocation). Browser API support still evolving. Chat E2EE moved to v1.0 (ADR-007), but voice E2EE remains v2.0.
+**Revisit When:** v1.0 is stable and Chat E2EE is working.
+
+### BB-006: Hearth Persona (DID-Based Cross-Server Identity)
+**Source:** Architecture discussion (2026-02-11)
+**Idea:** DID-based portable identity. Users carry a cryptographic persona across Houses without a central authority. "Prove you're the same person" via self-sovereign identity.
+**Why Deferred:** Federation/cross-server is a v2.0+ concern. DID ecosystem is still maturing. Research task R-010 created.
+**Revisit When:** After v1.0 ships. If users run multiple Houses and want shared identity.
+
+### BB-007: RTT Intimacy Mode
+**Source:** UX Research Report (Section 2.3), R-009 gap analysis
+**Idea:** Optional per-relationship Real-Time Text — see the other person typing live (letter by letter). Extremely intimate feature for very close friends. Toggle per-relationship, not global.
+**Why Deferred:** Too invasive as a default. Needs careful UX to avoid surveillance feeling. RTT anxiety well-documented in research.
+**Revisit When:** v2.0+ when the trust/relationship system is more developed.
 
 ### BB-004: Plugin Marketplace / Distribution
 **Source:** Master Plan (Section 11)
@@ -632,7 +678,19 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 **Source:** Open Question Q-004
 **Idea:** Low-res, low-fps ambient video — webcam as a portrait on the wall, not a traditional video call. Fits the "living room" metaphor.
 **Why Deferred:** Video is CPU-expensive on 1 vCPU. Voice-first is the v1.0 priority.
-**Revisit When:** After voice (v0.3) ships and we have real performance data.
+**Revisit When:** After voice (v0.4) ships and we have real performance data.
+
+### BB-008: Native Mobile (Capacitor / React Native)
+**Source:** Product philosophy discussion (2026-02-11)
+**Idea:** Wrap the PWA in Capacitor for native push notifications and app store distribution. React Native only if PWA hits an insurmountable wall (camera access, background audio, etc.).
+**Why Deferred:** PWA covers 95% of mobile needs at v1.0. Native wrapper adds build/deploy complexity.
+**Revisit When:** After v1.0 PWA is in real use and users report specific native-only gaps. Scheduled for v2.0 (O-030→O-032).
+
+### BB-009: Screen Share
+**Source:** Feature completeness audit (2026-02-11)
+**Idea:** WebRTC `getDisplayMedia()` for sharing screen content in Den voice sessions.
+**Why Deferred:** CPU-intensive on 1 vCPU. Not a daily-use feature for most groups. Voice and text cover 90% of use cases.
+**Revisit When:** v1.1 (W-009). Only if voice + video are stable and performant.
 
 ---
 
@@ -642,8 +700,15 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 
 | Term | Meaning | Avoid Saying |
 |------|---------|-------------|
-| **Portal** | Ambient spatial voice space | "voice channel," "voice room" |
-| **Campfire** | Ephemeral fading chat | "text channel," "chat room" |
+| **House** | A Hearth server instance | "server," "instance" |
+| **Den** | Permanent room + optional voice (Table + Corners) | "room," "channel," "voice channel" |
+| **Campfire** | Ephemeral fading chat (in the Backyard) | "text channel," "chat room" |
+| **Backyard** | Where Campfires live — outdoor annex to the House | "category," "section" |
+| **DM** | Direct message (permanent, 1:1) | "PM," "whisper" |
+| **Table** | Central voice area in a Den (everyone hears equally) | "main channel" |
+| **Corner** | Semi-private voice position in a Den | "breakout room" |
+| **Homeowner** | Server admin (full control) | "admin," "owner" |
+| **Keyholder** | Delegated admin (creates/configures Dens and Campfires) | "moderator," "mod" |
 | **Knock** | Guest entry request | "invite," "join request" |
 | **Peephole** | Host preview of a Knock | "notification," "alert" |
 | **Front Porch** | Waiting UI for guests | "waiting room," "lobby" |
