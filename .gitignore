@@ -12,6 +12,7 @@ Desktop.ini
 # PocketBase data
 pb_data/
 backend/pb_data/
+backend/pb_public/
 
 # Node
 node_modules/
