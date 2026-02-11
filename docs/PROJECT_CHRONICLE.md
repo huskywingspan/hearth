@@ -297,6 +297,7 @@ xcaddy build --with github.com/abiosoft/caddy-yaml --with github.com/mholt/caddy
 | BUG-001 | LOW | `message_gc.go` | `gcDeletedTotal.Add()` called with `float64` but `atomic.Int64.Add` requires `int64` | ✅ Fixed | 2026-02-11 | 2026-02-11 |
 | BUG-002 | LOW | `metrics.go` | `countRecords()` returned `int` but `app.CountRecords()` returns `int64` — type mismatch | ✅ Fixed | 2026-02-11 | 2026-02-11 |
 | BUG-003 | CRITICAL | `go.mod` | PocketBase version declared as v0.26.6 (nonexistent version matching code's API) — should be v0.36.2. Code used v0.36+ patterns (OnServe, OnBootstrap, core.NewBaseCollection). Prevented compilation. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
+| BUG-004 | CRITICAL | `pragmas.go` | `OnBootstrap` hook called `e.App.DB()` before `e.Next()`. DB is `nil` at this point — PocketBase opens the database *during* the bootstrap chain. Panic on startup. Fix: call `e.Next()` first, then apply PRAGMAs, then return `nil`. | ✅ Fixed | 2026-02-11 | 2026-02-11 |
 
 ---
 

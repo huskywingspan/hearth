@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"fmt"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -9,6 +11,9 @@ import (
 // This is idempotent — existing collections are skipped.
 func RegisterCollections(app *pocketbase.PocketBase) {
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		// Pass 1: Create collections WITHOUT API rules.
+		// Rules reference back-relations across collections (rooms ↔ room_members),
+		// so all collections must exist before rules can be validated by PocketBase.
 		if err := ensureUsersFields(se.App); err != nil {
 			se.App.Logger().Error("failed to extend users collection", "error", err)
 		}
@@ -21,6 +26,12 @@ func RegisterCollections(app *pocketbase.PocketBase) {
 		if err := ensureRoomMembersCollection(se.App); err != nil {
 			se.App.Logger().Error("failed to create room_members collection", "error", err)
 		}
+
+		// Pass 2: Apply API rules now that all collections exist.
+		if err := applyAPIRules(se.App); err != nil {
+			se.App.Logger().Error("failed to apply API rules", "error", err)
+		}
+
 		if err := createIndexes(se.App); err != nil {
 			se.App.Logger().Error("failed to create indexes", "error", err)
 		}
@@ -128,14 +139,7 @@ func ensureRoomsCollection(app core.App) error {
 		Max:      200,
 	})
 
-	// API Rules — access control
-	collection.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room_members_via_room.user`)
-	collection.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room_members_via_room.user`)
-	collection.CreateRule = stringPtr(`@request.auth.id != ""`)
-	collection.UpdateRule = stringPtr(`@request.auth.id = owner`)
-	collection.DeleteRule = stringPtr(`@request.auth.id = owner`)
-
-	// Add unique indexes
+	// Add unique indexes (rules applied in pass 2 via applyAPIRules)
 	collection.Indexes = []string{
 		"CREATE UNIQUE INDEX idx_rooms_slug ON rooms (slug)",
 		"CREATE UNIQUE INDEX idx_rooms_livekit ON rooms (livekit_room_name)",
@@ -188,12 +192,7 @@ func ensureMessagesCollection(app core.App) error {
 		Required: true,
 	})
 
-	// API Rules
-	collection.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
-	collection.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
-	collection.CreateRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
-	collection.UpdateRule = stringPtr(`@request.auth.id = author`)
-	collection.DeleteRule = stringPtr(`@request.auth.id = author || @request.auth.id = room.owner`)
+	// Rules applied in pass 2 via applyAPIRules
 
 	return app.Save(collection)
 }
@@ -236,11 +235,7 @@ func ensureRoomMembersCollection(app core.App) error {
 		MaxSelect:    1,
 	})
 
-	// API Rules
-	collection.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
-	collection.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
-	collection.CreateRule = stringPtr(`@request.auth.id != "" && @request.auth.id = room.owner`)
-	collection.DeleteRule = stringPtr(`@request.auth.id = room.owner || @request.auth.id = user`)
+	// Rules applied in pass 2 via applyAPIRules
 
 	// Unique constraint: one membership per user per room
 	collection.Indexes = []string{
@@ -248,6 +243,54 @@ func ensureRoomMembersCollection(app core.App) error {
 	}
 
 	return app.Save(collection)
+}
+
+// applyAPIRules sets API rules on all Hearth collections.
+// This runs AFTER all collections are created, so back-relation rules
+// (e.g., rooms referencing room_members_via_room) can be validated.
+func applyAPIRules(app core.App) error {
+	// Rooms rules
+	rooms, err := app.FindCollectionByNameOrId("rooms")
+	if err != nil {
+		return fmt.Errorf("rooms not found for rules: %w", err)
+	}
+	rooms.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room_members_via_room.user`)
+	rooms.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room_members_via_room.user`)
+	rooms.CreateRule = stringPtr(`@request.auth.id != ""`)
+	rooms.UpdateRule = stringPtr(`@request.auth.id = owner`)
+	rooms.DeleteRule = stringPtr(`@request.auth.id = owner`)
+	if err := app.Save(rooms); err != nil {
+		return fmt.Errorf("rooms rules: %w", err)
+	}
+
+	// Messages rules
+	messages, err := app.FindCollectionByNameOrId("messages")
+	if err != nil {
+		return fmt.Errorf("messages not found for rules: %w", err)
+	}
+	messages.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
+	messages.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
+	messages.CreateRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
+	messages.UpdateRule = stringPtr(`@request.auth.id = author`)
+	messages.DeleteRule = stringPtr(`@request.auth.id = author || @request.auth.id = room.owner`)
+	if err := app.Save(messages); err != nil {
+		return fmt.Errorf("messages rules: %w", err)
+	}
+
+	// Room members rules
+	members, err := app.FindCollectionByNameOrId("room_members")
+	if err != nil {
+		return fmt.Errorf("room_members not found for rules: %w", err)
+	}
+	members.ListRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
+	members.ViewRule = stringPtr(`@request.auth.id != "" && @request.auth.id ?= room.room_members_via_room.user`)
+	members.CreateRule = stringPtr(`@request.auth.id != "" && @request.auth.id = room.owner`)
+	members.DeleteRule = stringPtr(`@request.auth.id = room.owner || @request.auth.id = user`)
+	if err := app.Save(members); err != nil {
+		return fmt.Errorf("room_members rules: %w", err)
+	}
+
+	return nil
 }
 
 // createIndexes adds performance-critical indexes for the message GC query.
