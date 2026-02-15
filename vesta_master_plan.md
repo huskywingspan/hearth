@@ -186,6 +186,29 @@ WebRTC **requires** HTTPS/WSS — browsers block microphone access on insecure o
 
 Caddy's RAM footprint is negligible (~10MB) and fits within the OS/headroom budget. The exact container topology (single container with process supervisor vs. Docker Compose) is pending ADR-001 (see `docs/RESEARCH_BACKLOG.md`).
 
+### 2.1.2 Deployment Models
+
+Hearth supports two deployment topologies with a single codebase. The frontend connects to PocketBase and LiveKit via separate URLs — when they point to the same host, it's all-VPS; when they differ, it's split.
+
+**Model A: All-VPS (Simple)** — All 3 containers on one cheap VPS ($4-6/mo). One machine, one Docker Compose, done. Best for users who want zero hassle and don't have a homelab.
+
+**Model B: Split — Homelab + VPS (Privacy-Maximum)** — PocketBase at home (messages, auth, files stay on YOUR hardware), LiveKit on a VPS (stateless voice relay). PocketBase exposed via Cloudflare Tunnel (free, HTTP/WSS). LiveKit gets public IP for UDP media. This works because LiveKit tokens are JWTs validated locally — the two services never communicate at runtime.
+
+```
+Model A (All-VPS):                Model B (Split):
+┌────── VPS ──────┐               ┌── Home Server ──┐   ┌── VPS ──┐
+│ Caddy            │               │ PocketBase       │   │ LiveKit │
+│ PocketBase       │               │ (chat, auth, DB) │   │ (voice) │
+│ LiveKit          │               │ CF Tunnel (free) │   │ UDP     │
+└──────────────────┘               └──────────────────┘   └─────────┘
+```
+
+**Cost:** $0.40-0.60 per friend per month (Homeowner pays, friends are free). Cheaper than Discord Nitro ($9.99/mo per user). Oracle Cloud free tier may reduce this to $0.
+
+**Voice security:** DTLS-SRTP (mandatory WebRTC) encrypts all audio in transit. The SFU decrypts to route, then re-encrypts per recipient — identical to Discord, Zoom, Teams. The only entity with theoretical intercept capability is whoever has root on the VPS, which is the Homeowner. This is more secure than a phone call (GSM A5/1 cracked since 2009, landlines unencrypted). Full voice E2EE via Insertable Streams planned for v2.0.
+
+See R-012 (`docs/research/R-012-remote-access-architecture.md`) for full analysis.
+
 ### 2.2 Memory Budget (Sacred — 1GB Total)
 
 | Component | Allocation | Control Mechanism |

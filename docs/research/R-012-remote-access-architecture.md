@@ -252,6 +252,100 @@ The original roadmap had FF-010 as "Research: Cloudflare Tunnel setup for Pocket
 
 ---
 
+## Split Deployment: Homelab + VPS (Privacy-Maximum Architecture)
+
+**Decision (2026-02-15):** The architecture supports a split deployment where PocketBase stays at home and only LiveKit runs on the VPS. This emerged from the realization that LiveKit is **stateless** — it's a relay, not a database.
+
+### How It Works
+
+```
+┌──── Your Home Server ────┐     ┌──── VPS ($4/mo) ────┐
+│  PocketBase + Caddy       │     │  LiveKit only        │
+│  (chat, auth, DB, files)  │     │  (voice SFU)         │
+│  SQLite = YOUR disk       │     │  No persistent data  │
+└───────────┬───────────────┘     └──────────┬───────────┘
+            │ CF Tunnel (HTTP/WSS)            │ UDP direct
+            ↓                                 ↓
+        Friends get chat               Friends get voice
+```
+
+**Why this works:** LiveKit tokens are JWTs. LiveKit validates them locally using the shared API secret — it never calls back to PocketBase. The authentication flow:
+
+1. Friend connects to PocketBase (at home, exposed via CF Tunnel — free, HTTP/WSS)
+2. Friend authenticates, PocketBase signs a LiveKit JWT with the shared secret
+3. Friend connects to LiveKit (on VPS) presenting that JWT
+4. LiveKit validates the JWT signature locally → grants access
+5. Voice flows over UDP — low latency, direct
+
+The two services communicate **zero times at runtime.** They share one secret (the LiveKit API key/secret pair) configured at deploy time.
+
+### Comparison: All-VPS vs Split
+
+| Aspect | Everything on VPS | Split (Home + VPS) |
+|--------|-------------------|---------------------|
+| **Data sovereignty** | Data on rented server | SQLite stays on YOUR hardware |
+| **What's on VPS** | Everything | LiveKit only (stateless, ephemeral) |
+| **VPS cost** | $4-6/mo (CPU + RAM + disk) | $4/mo (CPU + RAM only, minimal disk) |
+| **Home server** | Not needed | Any old PC, NAS, Pi 4+ |
+| **CF Tunnel** | Not needed | Exposes PocketBase for free (HTTP/WSS) |
+| **If home internet drops** | Nothing breaks | Chat + voice both drop (auth unavailable) |
+| **If VPS drops** | Everything dies | Chat keeps working, voice drops |
+| **Complexity** | 1 machine, 1 Docker Compose | 2 machines, 2 configs |
+| **Privacy** | Good (self-hosted VPS) | Best (messages never leave your house) |
+
+### Voice Security on VPS: Better Than a Phone Call
+
+LiveKit uses **DTLS-SRTP** (mandatory in all WebRTC). Every audio packet is encrypted in transit between client and SFU. The SFU decrypts to route/mix, then re-encrypts per recipient. This is **encrypted in transit, not end-to-end** — identical to Discord, Zoom, Teams, and Google Meet.
+
+| Voice Technology | Encryption | Who Can Intercept |
+|-----------------|------------|-------------------|
+| Landline (PSTN) | **None.** Analog signals on copper. | Anyone with physical access to the line |
+| GSM cell | A5/1 cipher — **cracked since 2009** | Hobbyists with ~$20 SDR hardware |
+| LTE/VoLTE | 128-bit (carrier holds keys) | Carrier, law enforcement with warrant |
+| Discord/Zoom/Teams | DTLS-SRTP (server decrypts to mix) | Service operator (corporate servers) |
+| **Hearth (LiveKit on VPS)** | DTLS-SRTP (server decrypts to mix) | Only whoever has root on YOUR VPS |
+| Future: WebRTC E2EE | Insertable Streams (client-side) | Nobody (planned for v2.0) |
+
+**Key insight:** The only entity that could theoretically intercept Hearth voice is whoever has root on the VPS — and that's the Homeowner themselves. This is meaningfully more secure than a phone call, a Discord call, or a Zoom call.
+
+### The Hearth Metaphor
+
+This maps perfectly to the House vocabulary:
+
+- **Your home server = the House itself.** The walls, the furniture, the photo albums (messages, files, user data) — physically in your home.
+- **The VPS = the phone line.** It carries voices, but stores nothing. When a call ends, the VPS has zero record it happened. Cancel it and you lose voice, but keep everything else.
+- **CF Tunnel = the front door.** Friends Knock (HTTP), you answer. Free.
+
+### Frontend: Two URLs, One Codebase
+
+The frontend already connects to PocketBase and LiveKit via separate URLs. Supporting both deployment models requires zero code changes — just different config:
+
+```env
+# All-VPS deployment
+HEARTH_API_URL=https://hearth.example.com        # PocketBase on VPS
+HEARTH_VOICE_URL=wss://lk.hearth.example.com     # LiveKit on same VPS
+
+# Split deployment (homelab + VPS)
+HEARTH_API_URL=https://chat.myhouse.example.com   # PocketBase at home via CF Tunnel
+HEARTH_VOICE_URL=wss://voice.myhouse.example.com  # LiveKit on VPS
+```
+
+When both point to the same host → all-VPS. When they differ → split. The codebase doesn't care.
+
+### Cost Comparison: Cheaper Than Discord Nitro
+
+| Service | Monthly Cost | What You Get |
+|---------|-------------|--------------|
+| Discord (free) | $0 | Chat + voice, but: telemetry, ads, data harvesting, no self-hosting |
+| Discord Nitro | $9.99/mo | Emojis, file upload, profile — per USER |
+| Hearth (all-VPS) | $4-6/mo | Full chat + voice for your entire House (~10 friends) |
+| Hearth (split) | $4/mo (VPS) + free (home) | Same, with maximum privacy |
+| Hearth (Oracle free tier) | $0 | If Oracle Cloud ARM instance works — 1 vCPU, 1GB, always-free |
+
+Per-user cost for a 10-person House: **$0.40-0.60/month.** Less than a dollar per friend per month, and that's for the Homeowner only — friends pay nothing.
+
+---
+
 ## Quick-Test Mode: cloudflared One-Liner
 
 For v0.3 development, a developer can expose their PocketBase to a friend with zero setup:

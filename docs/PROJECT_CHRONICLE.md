@@ -111,6 +111,7 @@
 | 2026-02-15 | **Voice Risk Assessment** | Investigated WHY Stoat's self-hosted voice is broken. Root cause: migration complexity. Stoat originally built a custom WebRTC SFU called "Vortex," now migrating to **LiveKit** (same SFU Hearth uses). PR #414 merged to backend repo but NOT shipped to self-hosted Docker Compose. Migration requires new backend signaling, new frontend client (didn't backport to legacy Preact), and updated Docker Compose (tracking issue #176). Risk to Hearth: **LOW** — we're building on LiveKit from day one (R-005, R-006 complete). No legacy system to migrate from, no live users to disrupt, no split client codebase. LiveKit choice independently validated by Stoat selecting the same SFU after trying to build their own. |
 | 2026-02-15 | **Stoat Feature Assessment** | Evaluated Stoat features for potential adoption. Worth watching: native mobile apps (Android/iOS/Desktop via Electron) — we have PWA→Capacitor planned. AGPL-3.0 license choice — we haven't decided (M-005). 2.4k GitHub stars + bot ecosystem shows community-building potential. NOT adopting: microservices architecture (14 containers is their weakness, not strength), MongoDB/Redis/RabbitMQ dependencies, "server/channel" Discord vocabulary clone. Key takeaway: Stoat's 4-year head start proves the market exists, but their architectural complexity is the exact problem Hearth solves. |
 | 2026-02-15 | **R-012: Remote Access Architecture** | Cloudflare Tunnel cannot carry LiveKit voice/video — HTTP/WebSocket only, no raw UDP. Two-mode deployment architecture established: (1) Quick Test Mode — `cloudflared tunnel --url http://localhost:8090` for zero-config chat demos from home, (2) Production Mode — VPS with public IP, Caddy TLS, full UDP for LiveKit. Key insight: the "tunneling problem" only exists during home-based development; a VPS has a public IP by definition. Tailscale evaluated but adds friction (friend must install app). LiveKit TCP fallback adds 30-100ms latency — doesn't meet "5-minute-to-voice" quality bar. Roadmap updated: FF-010 complete, FF-017 (VPS deployment guide) added. |
+| 2026-02-15 | **Split Deployment Architecture Accepted** | Major deployment insight: PocketBase can stay on home hardware while only LiveKit runs on VPS. LiveKit is **stateless** (voice relay, stores nothing) and validates JWT tokens locally — never calls back to PocketBase at runtime. Two-URL frontend config (`HEARTH_API_URL` + `HEARTH_VOICE_URL`) supports both all-VPS and split topologies with zero code changes. Metaphor: "Your home server is the House; the VPS is the phone line." Split deployment = maximum privacy (messages never leave your house). All-VPS = simplest setup for non-homelab users ($4-6/mo total, ~$0.50/friend/month). Both are cheaper than Discord Nitro ($9.99/user/month). Voice security validated: DTLS-SRTP is more secure than GSM phone calls. Master plan §2.1.2 updated. R-012 expanded. |
 
 ---
 
@@ -184,6 +185,22 @@
     │  + SQLite    │            │   (SFU)      │
     └──────────────┘            └──────────────┘
 ```
+
+### Deployment Models (Accepted Feb 15, 2026)
+
+Two supported topologies — same codebase, different config:
+
+```
+All-VPS ($4-6/mo):                Split — Homelab + VPS ($4/mo):
+┌────── VPS ──────┐               ┌── Home Server ──┐   ┌── VPS ──┐
+│ Caddy            │               │ PocketBase       │   │ LiveKit │
+│ PocketBase       │               │ (chat, auth, DB) │   │ (voice) │
+│ LiveKit          │               │ CF Tunnel (free) │   │ UDP     │
+└──────────────────┘               └──────────────────┘   └─────────┘
+                                   Messages stay home     Stateless relay
+```
+
+LiveKit is stateless and validates JWTs locally — never calls PocketBase at runtime. Frontend uses separate `HEARTH_API_URL` + `HEARTH_VOICE_URL` env vars. See R-012 and master plan §2.1.2.
 
 ---
 
