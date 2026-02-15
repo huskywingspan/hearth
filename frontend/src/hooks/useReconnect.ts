@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import pb from '@/lib/pocketbase';
 
+/** Polling interval when SSE may not be working (e.g., behind a tunnel/proxy). */
+const POLL_INTERVAL_MS = 5_000;
+
 /**
- * Handles SSE reconnect state synchronization.
+ * Handles SSE reconnect state synchronization + polling fallback.
  * On every PB_CONNECT after the first, re-fetches data to catch missed events.
+ *
+ * Polling fallback:
+ * - If the PB client is talking to a remote server (not localhost/same-origin),
+ *   SSE may not work through proxies/tunnels. Poll every 5s as a fallback.
+ * - If SSE is working fine, the poll is harmless (just a no-op re-fetch).
  *
  * From R-004:
  * - PB_CONNECT fires on EVERY connection (including the first)
@@ -36,6 +44,16 @@ export function useReconnect(onResync: () => void) {
     return () => {
       unsubscribe.then((fn) => fn());
     };
+  }, [onResync]);
+
+  // Polling fallback — always runs, catches missed SSE events.
+  // Lightweight: PB returns cached/unchanged data if nothing changed.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      onResync();
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
   }, [onResync]);
 }
 
