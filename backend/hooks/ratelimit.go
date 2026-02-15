@@ -17,9 +17,9 @@ type RateLimiter struct {
 }
 
 type rateBucket struct {
-	tokens    float64
-	lastCheck time.Time
-	maxTokens float64
+	tokens     float64
+	lastCheck  time.Time
+	maxTokens  float64
 	refillRate float64 // tokens per second
 }
 
@@ -33,10 +33,12 @@ type RateLimitConfig struct {
 var (
 	// Auth endpoints (login/register): 5 requests per 15 minutes
 	rateLimitAuth = RateLimitConfig{MaxTokens: 5, RefillRate: 5.0 / 900.0}
+	// Auth refresh (token keepalive): 10 requests per minute — generous, it's not a login attempt
+	rateLimitAuthRefresh = RateLimitConfig{MaxTokens: 10, RefillRate: 10.0 / 60.0}
 	// Invite validation: 10 requests per minute
 	rateLimitInvite = RateLimitConfig{MaxTokens: 10, RefillRate: 10.0 / 60.0}
-	// General API: 60 requests per minute
-	rateLimitGeneral = RateLimitConfig{MaxTokens: 60, RefillRate: 1.0}
+	// General API: 120 requests per minute (covers room navigation bursts)
+	rateLimitGeneral = RateLimitConfig{MaxTokens: 120, RefillRate: 2.0}
 	// Message creation: 30 messages per minute (per user)
 	rateLimitMessage = RateLimitConfig{MaxTokens: 30, RefillRate: 0.5}
 	// Heartbeat: 6 requests per minute (normal is 2/min @ 30s interval)
@@ -59,9 +61,9 @@ func (rl *RateLimiter) Allow(key string, config RateLimitConfig) bool {
 	b, exists := rl.buckets[key]
 	if !exists {
 		rl.buckets[key] = &rateBucket{
-			tokens:    config.MaxTokens - 1, // consume one token
-			lastCheck: now,
-			maxTokens: config.MaxTokens,
+			tokens:     config.MaxTokens - 1, // consume one token
+			lastCheck:  now,
+			maxTokens:  config.MaxTokens,
 			refillRate: config.RefillRate,
 		}
 		return true
@@ -131,6 +133,9 @@ func RegisterRateLimit(app *pocketbase.PocketBase) {
 			var key string
 
 			switch {
+			case isAuthRefreshPath(path):
+				config = rateLimitAuthRefresh
+				key = "auth-refresh:" + ip
 			case isAuthPath(path):
 				config = rateLimitAuth
 				key = "auth:" + ip
@@ -182,9 +187,11 @@ func RegisterRateLimit(app *pocketbase.PocketBase) {
 // Path classification helpers
 
 func isAuthPath(path string) bool {
-	return matchPrefix(path, "/api/collections/users/auth-with-password") ||
-		matchPrefix(path, "/api/collections/users/records") ||
-		matchPrefix(path, "/api/collections/users/auth-refresh")
+	return matchPrefix(path, "/api/collections/users/auth-with-password")
+}
+
+func isAuthRefreshPath(path string) bool {
+	return matchPrefix(path, "/api/collections/users/auth-refresh")
 }
 
 func isInvitePath(path string) bool {

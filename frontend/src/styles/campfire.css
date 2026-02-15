@@ -11,10 +11,10 @@
  */
 
 @keyframes campfire-fade {
-  0%   { opacity: 1; }     /* Fresh — active conversation */
-  40%  { opacity: 0.5; }   /* Fading — past context */
-  80%  { opacity: 0.1; }   /* Echo — visual texture */
-  100% { opacity: 0; }     /* Gone — vanished */
+  0%   { opacity: 1;   filter: blur(0px); }                                      /* Fresh — active conversation */
+  40%  { opacity: 0.5; filter: blur(0px); }                                      /* Fading — past context */
+  80%  { opacity: 0.1; filter: blur(1px); color: var(--color-text-muted); }      /* Echo — spectral blur + gray */
+  100% { opacity: 0;   filter: blur(2px); color: var(--color-text-muted); }      /* Gone — vanished */
 }
 
 .campfire-message {

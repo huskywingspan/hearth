@@ -26,6 +26,12 @@ func RegisterCollections(app *pocketbase.PocketBase) {
 		if err := ensureRoomMembersCollection(se.App); err != nil {
 			se.App.Logger().Error("failed to create room_members collection", "error", err)
 		}
+		if err := ensureDirectMessagesCollection(se.App); err != nil {
+			se.App.Logger().Error("failed to create direct_messages collection", "error", err)
+		}
+		if err := ensureDmMessagesCollection(se.App); err != nil {
+			se.App.Logger().Error("failed to create dm_messages collection", "error", err)
+		}
 
 		// Pass 2: Apply API rules now that all collections exist.
 		if err := applyAPIRules(se.App); err != nil {
@@ -34,6 +40,19 @@ func RegisterCollections(app *pocketbase.PocketBase) {
 
 		if err := createIndexes(se.App); err != nil {
 			se.App.Logger().Error("failed to create indexes", "error", err)
+		}
+
+		// Pass 3: Backfill fields added to existing records (schema migrations).
+		if err := backfillSchemaDefaults(se.App); err != nil {
+			se.App.Logger().Error("failed to backfill schema defaults", "error", err)
+		}
+
+		// Pass 4: Seed "The Den" if no dens exist and we have a homeowner.
+		// This handles existing installs upgrading to v0.3 (first-user hook
+		// only seeds on NEW user creation, not retroactively).
+		owns, _ := se.App.FindRecordsByFilter("users", "role = 'homeowner'", "", 1, 0)
+		if len(owns) > 0 {
+			seedDefaultDen(se.App, owns[0].Id)
 		}
 
 		se.App.Logger().Info("Hearth collections verified")
@@ -74,14 +93,74 @@ func ensureUsersFields(app core.App) error {
 		})
 	}
 
+	// Add role if missing (ADR-007: Homeowner / Keyholder / Member)
+	if collection.Fields.GetByName("role") == nil {
+		collection.Fields.Add(&core.SelectField{
+			Name:      "role",
+			Values:    []string{"homeowner", "keyholder", "member"},
+			MaxSelect: 1,
+		})
+	}
+
+	// Add public_key if missing (E2EE readiness — v1.0, empty until enrolled)
+	if collection.Fields.GetByName("public_key") == nil {
+		collection.Fields.Add(&core.TextField{
+			Name: "public_key",
+			Max:  500,
+		})
+	}
+
 	return app.Save(collection)
 }
 
 // ensureRoomsCollection creates the rooms collection if it doesn't exist.
+// If it does exist, adds any missing ADR-007 fields incrementally.
 func ensureRoomsCollection(app core.App) error {
-	_, err := app.FindCollectionByNameOrId("rooms")
+	existing, err := app.FindCollectionByNameOrId("rooms")
 	if err == nil {
-		return nil // already exists
+		// Collection exists — ensure ADR-007 fields are present (schema migration)
+		changed := false
+
+		// Relax default_ttl constraints to allow 0 for dens (no message expiry).
+		// Original schema (v0.2.1) had Required:true, Min:60 — incompatible with den TTL=0.
+		if f := existing.Fields.GetByName("default_ttl"); f != nil {
+			if nf, ok := f.(*core.NumberField); ok {
+				if nf.Required || (nf.Min != nil && *nf.Min > 0) {
+					nf.Required = false
+					nf.Min = floatPtr(0)
+					changed = true
+				}
+			}
+		}
+
+		if existing.Fields.GetByName("type") == nil {
+			existing.Fields.Add(&core.SelectField{
+				Name:      "type",
+				Values:    []string{"den", "campfire"},
+				MaxSelect: 1,
+			})
+			changed = true
+		}
+
+		if existing.Fields.GetByName("voice") == nil {
+			existing.Fields.Add(&core.BoolField{Name: "voice"})
+			changed = true
+		}
+
+		if existing.Fields.GetByName("video") == nil {
+			existing.Fields.Add(&core.BoolField{Name: "video"})
+			changed = true
+		}
+
+		if existing.Fields.GetByName("history_visible") == nil {
+			existing.Fields.Add(&core.BoolField{Name: "history_visible"})
+			changed = true
+		}
+
+		if changed {
+			return app.Save(existing)
+		}
+		return nil
 	}
 
 	// Look up the actual users collection ID — PocketBase requires
@@ -122,10 +201,9 @@ func ensureRoomsCollection(app core.App) error {
 	})
 
 	collection.Fields.Add(&core.NumberField{
-		Name:     "default_ttl",
-		Required: true,
-		Min:      floatPtr(60),    // 1 minute minimum
-		Max:      floatPtr(86400), // 24 hours maximum
+		Name: "default_ttl",
+		Min:  floatPtr(0),     // 0 = den (no expiry), 60+ = campfire
+		Max:  floatPtr(86400), // 24 hours maximum
 	})
 
 	collection.Fields.Add(&core.NumberField{
@@ -144,6 +222,25 @@ func ensureRoomsCollection(app core.App) error {
 		Required: true,
 		Min:      1,
 		Max:      200,
+	})
+
+	// ADR-007: Channel architecture fields
+	collection.Fields.Add(&core.SelectField{
+		Name:      "type",
+		Values:    []string{"den", "campfire"},
+		MaxSelect: 1,
+	})
+
+	collection.Fields.Add(&core.BoolField{
+		Name: "voice",
+	})
+
+	collection.Fields.Add(&core.BoolField{
+		Name: "video",
+	})
+
+	collection.Fields.Add(&core.BoolField{
+		Name: "history_visible",
 	})
 
 	// Add unique indexes (rules applied in pass 2 via applyAPIRules)
@@ -165,6 +262,21 @@ func ensureMessagesCollection(app core.App) error {
 			existing.Fields.Add(&core.TextField{
 				Name: "author_name",
 				Max:  50,
+			})
+			changed = true
+		}
+		if existing.Fields.GetByName("created") == nil {
+			existing.Fields.Add(&core.AutodateField{
+				Name:     "created",
+				OnCreate: true,
+			})
+			changed = true
+		}
+		if existing.Fields.GetByName("updated") == nil {
+			existing.Fields.Add(&core.AutodateField{
+				Name:     "updated",
+				OnCreate: true,
+				OnUpdate: true,
 			})
 			changed = true
 		}
@@ -224,6 +336,17 @@ func ensureMessagesCollection(app core.App) error {
 	collection.Fields.Add(&core.DateField{
 		Name:     "expires_at",
 		Required: true,
+	})
+
+	collection.Fields.Add(&core.AutodateField{
+		Name:     "created",
+		OnCreate: true,
+	})
+
+	collection.Fields.Add(&core.AutodateField{
+		Name:     "updated",
+		OnCreate: true,
+		OnUpdate: true,
 	})
 
 	// Rules applied in pass 2 via applyAPIRules
@@ -289,10 +412,203 @@ func ensureRoomMembersCollection(app core.App) error {
 	return app.Save(collection)
 }
 
+// ensureDirectMessagesCollection creates the direct_messages collection for 1:1 DMs.
+func ensureDirectMessagesCollection(app core.App) error {
+	existing, err := app.FindCollectionByNameOrId("direct_messages")
+	if err == nil {
+		// Collection exists — ensure autodate fields are present
+		changed := false
+		if existing.Fields.GetByName("created") == nil {
+			existing.Fields.Add(&core.AutodateField{
+				Name:     "created",
+				OnCreate: true,
+			})
+			changed = true
+		}
+		if existing.Fields.GetByName("updated") == nil {
+			existing.Fields.Add(&core.AutodateField{
+				Name:     "updated",
+				OnCreate: true,
+				OnUpdate: true,
+			})
+			changed = true
+		}
+		if changed {
+			return app.Save(existing)
+		}
+		return nil
+	}
+
+	usersCol, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return fmt.Errorf("users collection not found: %w", err)
+	}
+
+	collection := core.NewBaseCollection("direct_messages")
+
+	// Participant A (always the lower-sorted user ID for uniqueness)
+	collection.Fields.Add(&core.RelationField{
+		Name:         "participant_a",
+		Required:     true,
+		CollectionId: usersCol.Id,
+		MaxSelect:    1,
+	})
+
+	// Participant B (always the higher-sorted user ID)
+	collection.Fields.Add(&core.RelationField{
+		Name:         "participant_b",
+		Required:     true,
+		CollectionId: usersCol.Id,
+		MaxSelect:    1,
+	})
+
+	collection.Fields.Add(&core.AutodateField{
+		Name:     "created",
+		OnCreate: true,
+	})
+
+	collection.Fields.Add(&core.AutodateField{
+		Name:     "updated",
+		OnCreate: true,
+		OnUpdate: true,
+	})
+
+	collection.Indexes = []string{
+		"CREATE UNIQUE INDEX idx_dm_participants ON direct_messages (participant_a, participant_b)",
+	}
+
+	return app.Save(collection)
+}
+
+// ensureDmMessagesCollection creates the dm_messages collection for DM text messages.
+func ensureDmMessagesCollection(app core.App) error {
+	existing, err := app.FindCollectionByNameOrId("dm_messages")
+	if err == nil {
+		// Collection exists — ensure autodate fields are present
+		changed := false
+		if existing.Fields.GetByName("created") == nil {
+			existing.Fields.Add(&core.AutodateField{
+				Name:     "created",
+				OnCreate: true,
+			})
+			changed = true
+		}
+		if existing.Fields.GetByName("updated") == nil {
+			existing.Fields.Add(&core.AutodateField{
+				Name:     "updated",
+				OnCreate: true,
+				OnUpdate: true,
+			})
+			changed = true
+		}
+		if changed {
+			return app.Save(existing)
+		}
+		return nil
+	}
+
+	dmCol, err := app.FindCollectionByNameOrId("direct_messages")
+	if err != nil {
+		return fmt.Errorf("direct_messages collection not found: %w", err)
+	}
+	usersCol, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return fmt.Errorf("users collection not found: %w", err)
+	}
+
+	collection := core.NewBaseCollection("dm_messages")
+
+	collection.Fields.Add(&core.RelationField{
+		Name:          "dm",
+		Required:      true,
+		CollectionId:  dmCol.Id,
+		MaxSelect:     1,
+		CascadeDelete: true,
+	})
+
+	collection.Fields.Add(&core.RelationField{
+		Name:         "author",
+		Required:     true,
+		CollectionId: usersCol.Id,
+		MaxSelect:    1,
+	})
+
+	collection.Fields.Add(&core.TextField{
+		Name: "author_name",
+		Max:  50,
+	})
+
+	collection.Fields.Add(&core.TextField{
+		Name:     "body",
+		Required: true,
+		Min:      1,
+		Max:      4000,
+	})
+
+	collection.Fields.Add(&core.AutodateField{
+		Name:     "created",
+		OnCreate: true,
+	})
+
+	collection.Fields.Add(&core.AutodateField{
+		Name:     "updated",
+		OnCreate: true,
+		OnUpdate: true,
+	})
+
+	return app.Save(collection)
+}
+
+// backfillSchemaDefaults sets default values on existing records that lack new fields.
+// This handles the v0.2.1 → v0.3 migration (ADR-007).
+func backfillSchemaDefaults(app core.App) error {
+	// Backfill rooms: existing rooms without a type → campfire
+	if _, err := app.DB().NewQuery(
+		`UPDATE rooms SET type = 'campfire' WHERE type = '' OR type IS NULL`,
+	).Execute(); err != nil {
+		return fmt.Errorf("backfill rooms.type: %w", err)
+	}
+
+	// Backfill rooms: set history_visible default for existing rooms
+	if _, err := app.DB().NewQuery(
+		`UPDATE rooms SET history_visible = 1 WHERE history_visible IS NULL`,
+	).Execute(); err != nil {
+		return fmt.Errorf("backfill rooms.history_visible: %w", err)
+	}
+
+	// Backfill users: existing users without a role → member
+	if _, err := app.DB().NewQuery(
+		`UPDATE users SET role = 'member' WHERE role = '' OR role IS NULL`,
+	).Execute(); err != nil {
+		return fmt.Errorf("backfill users.role: %w", err)
+	}
+
+	// Crown the first user as homeowner (by creation timestamp)
+	if _, err := app.DB().NewQuery(
+		`UPDATE users SET role = 'homeowner' WHERE id = (SELECT id FROM users ORDER BY created ASC LIMIT 1) AND role != 'homeowner'`,
+	).Execute(); err != nil {
+		// Don't fail startup if there are no users yet
+		app.Logger().Warn("homeowner backfill skipped (maybe no users yet)", "error", err)
+	}
+
+	return nil
+}
+
 // applyAPIRules sets API rules on all Hearth collections.
 // This runs AFTER all collections are created, so back-relation rules
 // (e.g., rooms referencing room_members_via_room) can be validated.
 func applyAPIRules(app core.App) error {
+	// Users rules — allow authenticated users to search for other users (for DMs)
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return fmt.Errorf("users not found for rules: %w", err)
+	}
+	users.ListRule = stringPtr(`@request.auth.id != ""`)
+	users.ViewRule = stringPtr(`@request.auth.id != ""`)
+	if err := app.Save(users); err != nil {
+		return fmt.Errorf("users rules: %w", err)
+	}
+
 	// Rooms rules
 	rooms, err := app.FindCollectionByNameOrId("rooms")
 	if err != nil {
@@ -336,6 +652,34 @@ func applyAPIRules(app core.App) error {
 	members.DeleteRule = stringPtr(`@request.auth.id = room.owner || @request.auth.id = user`)
 	if err := app.Save(members); err != nil {
 		return fmt.Errorf("room_members rules: %w", err)
+	}
+
+	// Direct messages rules — only participants can see their DMs
+	dms, err := app.FindCollectionByNameOrId("direct_messages")
+	if err != nil {
+		return fmt.Errorf("direct_messages not found for rules: %w", err)
+	}
+	dms.ListRule = stringPtr(`participant_a = @request.auth.id || participant_b = @request.auth.id`)
+	dms.ViewRule = stringPtr(`participant_a = @request.auth.id || participant_b = @request.auth.id`)
+	dms.CreateRule = stringPtr(`@request.auth.id != ""`)
+	dms.UpdateRule = nil // DMs cannot be updated
+	dms.DeleteRule = nil // DMs cannot be deleted (permanent)
+	if err := app.Save(dms); err != nil {
+		return fmt.Errorf("direct_messages rules: %w", err)
+	}
+
+	// DM messages rules — only participants of the parent DM can read/write
+	dmMsgs, err := app.FindCollectionByNameOrId("dm_messages")
+	if err != nil {
+		return fmt.Errorf("dm_messages not found for rules: %w", err)
+	}
+	dmMsgs.ListRule = stringPtr(`dm.participant_a = @request.auth.id || dm.participant_b = @request.auth.id`)
+	dmMsgs.ViewRule = stringPtr(`dm.participant_a = @request.auth.id || dm.participant_b = @request.auth.id`)
+	dmMsgs.CreateRule = stringPtr(`dm.participant_a = @request.auth.id || dm.participant_b = @request.auth.id`)
+	dmMsgs.UpdateRule = stringPtr(`author = @request.auth.id`)
+	dmMsgs.DeleteRule = stringPtr(`author = @request.auth.id`)
+	if err := app.Save(dmMsgs); err != nil {
+		return fmt.Errorf("dm_messages rules: %w", err)
 	}
 
 	return nil

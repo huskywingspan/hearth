@@ -473,9 +473,9 @@ func TestRateLimiterSweepStale(t *testing.T) {
 	// Manually age a bucket
 	rl.mu.Lock()
 	rl.buckets["stale-key"] = &rateBucket{
-		tokens:    5,
-		lastCheck: time.Now().Add(-20 * time.Minute),
-		maxTokens: 10,
+		tokens:     5,
+		lastCheck:  time.Now().Add(-20 * time.Minute),
+		maxTokens:  10,
 		refillRate: 1.0,
 	}
 	rl.mu.Unlock()
@@ -686,10 +686,18 @@ func TestIsAuthPath(t *testing.T) {
 	if !isAuthPath("/api/collections/users/auth-with-password") {
 		t.Error("should match auth-with-password")
 	}
-	if !isAuthPath("/api/collections/users/records") {
-		t.Error("should match records (register)")
+	// /api/collections/users/records is now general rate-limited (user search for DMs)
+	if isAuthPath("/api/collections/users/records") {
+		t.Error("should NOT match records — it's a general endpoint now")
 	}
 	if isAuthPath("/api/hearth/rooms/abc/token") {
 		t.Error("should not match rooms token endpoint")
+	}
+	// auth-refresh has its own path classifier
+	if isAuthPath("/api/collections/users/auth-refresh") {
+		t.Error("should NOT match auth-refresh — it has its own limiter")
+	}
+	if !isAuthRefreshPath("/api/collections/users/auth-refresh") {
+		t.Error("should match auth-refresh path")
 	}
 }

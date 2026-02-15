@@ -1,46 +1,44 @@
 import { useEffect, useState, useCallback } from 'react';
 import pb from '@/lib/pocketbase';
 import { useReconnect } from './useReconnect';
-import { MESSAGE_PAGE_SIZE } from '@/lib/constants';
 
-export interface Message {
+export interface DmMessage {
   id: string;
-  body: string;
-  room: string;
+  dm: string;
   author: string;
   author_name: string;
-  expires_at: string;
+  body: string;
   created: string;
-  expand?: {
-    author?: { display_name: string; avatar_url: string };
-  };
 }
 
-export function useMessages(roomId: string) {
-  const [messages, setMessages] = useState<Message[]>([]);
+const DM_PAGE_SIZE = 200;
+
+/**
+ * Messages hook for DM conversations — permanent messages.
+ * Subscribes to `dm_messages` collection, filters by DM ID.
+ */
+export function useDmMessages(dmId: string) {
+  const [messages, setMessages] = useState<DmMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch current messages for this room
   const fetchMessages = useCallback(async () => {
-    if (!roomId) return;
+    if (!dmId) return;
     try {
       const result = await pb
-        .collection('messages')
-        .getList<Message>(1, MESSAGE_PAGE_SIZE, {
-          filter: `room = "${roomId}"`,
+        .collection('dm_messages')
+        .getList<DmMessage>(1, DM_PAGE_SIZE, {
+          filter: `dm = "${dmId}"`,
           sort: 'created',
-          expand: 'author',
           requestKey: null,
         });
       setMessages(result.items);
     } catch (err) {
-      console.error('Failed to fetch messages:', err);
+      console.error('Failed to fetch DM messages:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [roomId]);
+  }, [dmId]);
 
-  // Initial fetch
   useEffect(() => {
     setIsLoading(true);
     fetchMessages();
@@ -48,19 +46,17 @@ export function useMessages(roomId: string) {
 
   // Real-time subscription
   useEffect(() => {
-    if (!roomId) return;
+    if (!dmId) return;
 
     const unsubPromise = pb
-      .collection('messages')
-      .subscribe<Message>('*', (data) => {
-        if (data.record.room !== roomId) return;
+      .collection('dm_messages')
+      .subscribe<DmMessage>('*', (data) => {
+        if (data.record.dm !== dmId) return;
 
         switch (data.action) {
           case 'create':
             setMessages((prev) => {
-              // Skip own messages — the optimistic send flow handles them
               if (data.record.author === pb.authStore.record?.id) return prev;
-              // Also deduplicate by id just in case
               if (prev.some((m) => m.id === data.record.id)) return prev;
               return [...prev, data.record];
             });
@@ -71,7 +67,6 @@ export function useMessages(roomId: string) {
             );
             break;
           case 'delete':
-            // Server GC deleted an expired message — remove from state
             setMessages((prev) =>
               prev.filter((m) => m.id !== data.record.id)
             );
@@ -82,52 +77,40 @@ export function useMessages(roomId: string) {
     return () => {
       unsubPromise.then((unsub) => unsub());
     };
-  }, [roomId]);
+  }, [dmId]);
 
-  // Reconnect: re-fetch everything (missed events are not replayed per R-004)
   useReconnect(fetchMessages);
-
-  // Remove a message client-side (e.g., after animationend)
-  const removeMessage = useCallback((id: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
-  }, []);
 
   // Optimistic send
   const sendMessage = useCallback(
     async (text: string) => {
       const tempId = `temp-${Date.now()}`;
-      const optimistic: Message = {
+      const optimistic: DmMessage = {
         id: tempId,
-        body: text,
-        room: roomId,
+        dm: dmId,
         author: pb.authStore.record?.id ?? '',
         author_name: pb.authStore.record?.['display_name'] ?? 'Wanderer',
-        expires_at: new Date(Date.now() + 300_000).toISOString(), // 5 min placeholder
+        body: text,
         created: new Date().toISOString(),
       };
 
-      // Immediately add to state (optimistic UI)
       setMessages((prev) => [...prev, optimistic]);
 
       try {
-        const real = await pb.collection('messages').create<Message>({
-          body: text,
-          room: roomId,
+        const real = await pb.collection('dm_messages').create<DmMessage>({
+          dm: dmId,
           author: pb.authStore.record?.id,
-          // Server enforces expires_at via TTL hook
+          body: text,
         });
-        // Replace optimistic with real record
         setMessages((prev) =>
           prev.map((m) => (m.id === tempId ? real : m))
         );
       } catch {
-        // Revert on failure
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        // TODO: show error toast via toast context
       }
     },
-    [roomId]
+    [dmId]
   );
 
-  return { messages, isLoading, sendMessage, removeMessage };
+  return { messages, isLoading, sendMessage };
 }
