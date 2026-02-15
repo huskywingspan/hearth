@@ -462,10 +462,41 @@ Dynamic mixing: ambient volume rises during conversation lulls, ducks when someo
 |-----------|-----------|---------------|
 | **Discord** | Noisy, gamer-maximalist, Nitro upsells, "Times Square" UI | Radical Quiet — hide controls during conversation; no upsells |
 | **Matrix / Element** | Engineer brutalism — exposes raw protocol plumbing, cold UI, no sense of "place" | Protocol abstraction — hide hashes/keys; warmth-first design |
-| **Guilded / Revolt** | Feature-bloat Discord clones — copy the UI, add more buttons | Contextual minimalism — "Home" metaphor, not server/channel folders |
+| **Stoat / Revolt** | Discord clone with Discord's complexity (14 containers, MongoDB, Redis, RabbitMQ, MinIO). Self-hosted voice broken for 2+ years. UK-based (Online Safety Act). 2 vCPU / 2GB minimum. | 3 containers, SQLite (embedded), 1 vCPU / 1GB. Self-hosted voice as a core deliverable (v0.4). No central authority. |
 | **Gather.town** | Gamification trap — pixel art, WASD navigation fatigue, "toy not tool" | Abstract topology, click-to-drift, magnetic zones |
 | **Zoom** | Scheduled, performative, waiting room purgatory | Ambient always-on presence; "Front Porch" with hospitality |
 | **iMessage / WhatsApp / Signal** | No voice presence, no "room" concept, group chats are flat text | Always-on voice Dens, spatial audio, visual warmth, fading Campfires |
+
+### 7.1 Deep Dive: Stoat (née Revolt)
+
+> **Added:** 2026-02-15 | Stoat rebranded from "Revolt" in October 2025 after a cease & desist. Same team (Revolt Platforms Ltd, UK), same codebase (Rust + Solid.js), new name.
+
+**Positioning:** "The open source Discord alternative." Pitches identical feature set (text channels, permissions, mod tools, bots). Invites direct feature-by-feature comparison with Discord — and loses, because Discord has 500 engineers.
+
+**Infrastructure Comparison:**
+
+| | Stoat | Hearth |
+|---|------|--------|
+| **Containers** | 14 (API, Events, Web, Autumn, January, Gifbox, Crond, Pushd, + infrastructure) | 3 (PocketBase, LiveKit, Caddy) |
+| **Database** | MongoDB | SQLite (embedded in PocketBase) |
+| **Message broker** | Redis (KeyDB) + RabbitMQ | None needed |
+| **File storage** | MinIO (S3-compatible) | PocketBase (built-in file fields) |
+| **Minimum RAM** | 2 GB (recommended) | 1 GB (target) |
+| **Minimum CPU** | 2 vCPU (recommended) | 1 vCPU (target) |
+| **Self-hosted voice** | Broken for 2+ years (GitHub issue #313, opened Jan 2023). Migrating from custom "Vortex" to LiveKit. | Planned for v0.4 (LiveKit, researched via R-005/R-006) |
+| **Setup complexity** | `generate_config.sh`, `Revolt.toml`, `.env.web`, 14 services | `docker compose up -d` (target: 3 services) |
+| **License** | AGPL-3.0 | TBD (M-005) |
+
+**Why Their Voice Is Broken (and why ours won't be):**
+
+Stoat originally built a custom WebRTC solution called "Vortex." They are now rewriting it to use **LiveKit** (same SFU we've chosen), but the migration requires:
+1. New backend signaling integration (PR #414, merged but not shipped to self-hosted)
+2. New frontend client (they didn't backport voice features to the legacy client)
+3. Self-hosted Docker Compose updates to add LiveKit as a service (tracking issue #176)
+
+Their problem is **migration complexity** — they have a live platform with users on the old system, a legacy client and a new client, and 14 containers that all need coordinated updates. We have none of that baggage. We're building on LiveKit from day one (R-005, R-006 already complete). Our voice implementation will be designed for self-hosted from the start, not bolted on after the fact.
+
+**Moat assessment:** Stoat's real advantage is **time and community** (4+ years, 2.4k GitHub stars, native mobile apps). But they chose to clone Discord's complexity along with its features. Hearth's moat is simplicity, warmth, and the fact that voice will work out of the box on self-hosted.
 
 ---
 
@@ -473,7 +504,7 @@ Dynamic mixing: ambient volume rises during conversation lulls, ducks when someo
 
 - **TypeScript:** Strict mode. Functional components only. No class components.
 - **Go:** Standard conventions. Minimize allocations in hot paths. `GOMEMLIMIT` always set.
-- **Naming:** Use Hearth vocabulary — Portal, Campfire, Knock, Cartridge, Front Porch, Peephole, Ember.
+- **Naming:** Use Hearth vocabulary — Den, Campfire, Knock, Cartridge, Front Porch, Peephole, Ember.
 - **CSS:** TailwindCSS utilities. Custom design tokens for Subtle Warmth palette.
 - **Testing:** Unit tests for all business logic. Integration tests for PocketBase hooks and LiveKit signaling.
 - **Privacy:** No telemetry, analytics, or tracking of any kind. Ever.

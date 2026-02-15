@@ -36,3 +36,6 @@ pb_data_vol/
 
 # Go module cache (if vendored)
 vendor/
+
+# Local secrets / scratch notes
+hearth_setup.txt
