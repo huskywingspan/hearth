@@ -1,6 +1,6 @@
 # Hearth — Release Roadmap & Task Breakdown
 
-> **Last Updated:** 2026-02-11
+> **Last Updated:** 2026-02-15
 > **Phase:** v0.2.1 Settling In complete — ready for v0.3 First Friend
 
 ---
@@ -190,13 +190,14 @@
 ### Phase 0.3.B — Remote Access (Cloudflare Tunnel)
 | ID | Task | Type | Status | Notes |
 |----|------|------|--------|-------|
-| FF-010 | Research: Cloudflare Tunnel setup for PocketBase | Research | Not Started | Zero-config remote access |
-| FF-011 | Tunnel configuration (cloudflared) + documentation | Build | Not Started | |
-| FF-012 | Connect-to-server flow (enter server URL in frontend) | Build | Not Started | Dynamic PocketBase endpoint |
+| FF-010 | Research: Remote access architecture (CF Tunnel, VPS, WebRTC) | Research | ✅ Done | R-012 complete. CF Tunnel for dev chat, VPS for production. No UDP through CF Tunnel. |
+| FF-011 | Quick-test mode: cloudflared script for chat dev/demo | Build | Not Started | `cloudflared tunnel --url http://localhost:8090` |
+| FF-012 | Connect-to-server flow (enter/scan server URL in frontend) | Build | Not Started | Dynamic PocketBase endpoint, localStorage |
 | FF-013 | First-impression audit: what does a new user see? | Design | Not Started | Onboarding polish |
 | FF-014 | QR code generation for House URL | Build | Not Started | Homeowner generates QR → share via text/print. Zero URL typing. |
 | FF-015 | QR code scan/connect flow in frontend | Build | Not Started | Camera access → decode → connect |
 | FF-016 | PWA manifest + Service Worker (install prompt, offline shell) | Build | Not Started | Mobile as first-class citizen |
+| FF-017 | VPS production deployment guide | Docs | Not Started | Caddy + PB + LiveKit on VPS with public IP. Complete firewall + DNS setup. |
 
 ### Phase 0.3.C — Landing Page (hearthapp.chat)
 | ID | Task | Type | Status | Notes |

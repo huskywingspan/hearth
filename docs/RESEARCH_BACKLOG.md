@@ -1,6 +1,6 @@
 # Hearth — Research Backlog & Open Questions
 
-> **Last Updated:** 2026-02-11 (R-009 gap analysis completed, ADR-007 accepted)
+> **Last Updated:** 2026-02-15 (R-012 remote access architecture completed)
 > **Owner:** Researcher Agent
 
 ---
@@ -8,6 +8,7 @@
 ## Completed Research Tasks
 
 > All high-priority research (R-001 through R-006) is now complete. Backend, frontend SDK, deployment, and spatial audio are unblocked.
+> R-012 (remote access architecture) complete — Cloudflare Tunnel for dev, VPS for production. See R-012 report.
 
 ---
 
@@ -58,6 +59,11 @@
 **Priority:** High | **Blocks:** ADR-007, Sprint 4 planning
 **Status:** Complete — 2026-02-11 | **Report:** [`docs/research/R-009-research-gap-analysis.md`](research/R-009-research-gap-analysis.md)
 **Outcome:** Compared original research reports against master plan. 80% of ideas carried forward. Key findings: (1) We built Discord's sidebar layout despite research warning against it — House navigation model needed for v1.1. (2) Room type enum was in original research — carried into ADR-007. (3) Docker vs systemd tradeoff was undocumented pivot. (4) Ghost Text Echo stage lost blur+gray shift. (5) Video cap (480p) undefined for voice rooms. Full ranked list of 10 lost ideas with sprint targets.
+
+### R-012: Remote Access Architecture — CF Tunnel, VPS, and WebRTC ✅ COMPLETE
+**Priority:** High | **Blocks:** FF-010, FF-011, FF-012
+**Status:** Complete — 2026-02-15 | **Report:** [`docs/research/R-012-remote-access-architecture.md`](research/R-012-remote-access-architecture.md)
+**Outcome:** **Cloudflare Tunnel cannot carry LiveKit voice/video traffic** — it only supports HTTP/HTTPS/WebSocket, not raw UDP. PocketBase works perfectly through CF Tunnel. Two-mode deployment architecture recommended: (1) Quick Test Mode — CF Tunnel for chat-only dev (`cloudflared tunnel --url http://localhost:8090`, zero config, free), (2) Production Mode — VPS with public IP, Caddy TLS, full UDP for LiveKit. Tailscale evaluated (UDP works via WireGuard, but requires friend to install app — friction). LiveKit TCP fallback exists but adds 30-100ms latency with head-of-line blocking — doesn't meet "5-minute-to-voice" quality bar. Key insight: VPS has a public IP by definition, so the "tunneling problem" only exists during home-based development. Roadmap updated: FF-010 complete (this report), FF-017 added for VPS production deployment guide.
 
 ### R-010: Hearth Persona — Cross-Server Identity (DID)
 **Priority:** Low | **Blocks:** O-020, O-021
@@ -154,3 +160,4 @@
 | R-006 | Web Audio Spatial Audio (2D) | 2026-02-10 | PannerNode linear distance model, equalpower panning, Z=0 for 2D. Complete `useSpatialAudio` hook. ~2% CPU at 20 participants. |
 | R-008 | CSS Animation Performance (Fading) | 2026-02-11 | Compositor-thread GPU animation safe at 200+ concurrent. `content-visibility: auto` for browser-native virtualization. No JS libs needed. TanStack Virtual deferred as fallback. |
 | R-009 | Research Gap Analysis | 2026-02-11 | Compared research reports vs master plan. 80% carry-through. Key drops: sidebar layout warning, room type enum, Docker pivot, Ghost Text detail. Top 10 ranked lost ideas. ADR-007 informed. |
+| R-012 | Remote Access Architecture | 2026-02-15 | CF Tunnel: HTTP/WSS only, no UDP. PocketBase perfect, LiveKit media blocked. Two-mode deployment: CF Tunnel for dev chat, VPS for production. TCP fallback adds 30-100ms (unacceptable for voice). Tailscale works but adds friction. VPS is the answer for production. |
